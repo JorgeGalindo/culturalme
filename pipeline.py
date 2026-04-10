@@ -13,6 +13,12 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "data" / "culturalme.db"
 ARTISTS_PATH = Path(__file__).parent / "data" / "artists.json"
 
+# Eventos que nunca deben entrar (instalaciones permanentes, etc.)
+# Matched case-insensitive against (title, source) pairs
+GLOBAL_EXCLUDE = [
+    ("Julia", "Fundación Masaveu"),
+]
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
@@ -50,9 +56,18 @@ def event_id(source: str, title: str, venue: str | None, date_start: str | None)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
+def _is_excluded(e: dict) -> bool:
+    """Comprueba si un evento está en la lista de exclusión global."""
+    for title, source in GLOBAL_EXCLUDE:
+        if e.get("title", "").lower().strip() == title.lower() and e.get("source", "").lower().strip() == source.lower():
+            return True
+    return False
+
+
 def upsert_events(con: sqlite3.Connection, events: list[dict]):
     """Inserta eventos nuevos o actualiza last_seen de los existentes."""
     today = date.today().isoformat()
+    events = [e for e in events if not _is_excluded(e)]
     for e in events:
         eid = event_id(e["source"], e["title"], e.get("venue"), e.get("date_start"))
         existing = con.execute("SELECT id FROM events WHERE id = ?", (eid,)).fetchone()
@@ -86,6 +101,7 @@ def upsert_events(con: sqlite3.Connection, events: list[dict]):
 def replace_section(con: sqlite3.Connection, section: str, events: list[dict]):
     """Reemplaza todos los eventos de una sección (para cine, que no acumula)."""
     today = date.today().isoformat()
+    events = [e for e in events if not _is_excluded(e)]
     con.execute("DELETE FROM events WHERE section = ?", (section,))
     for e in events:
         eid = event_id(e["source"], e["title"], e.get("venue"), e.get("date_start"))
