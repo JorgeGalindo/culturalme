@@ -14,9 +14,10 @@ DB_PATH = Path(__file__).parent / "data" / "culturalme.db"
 ARTISTS_PATH = Path(__file__).parent / "data" / "artists.json"
 
 # Eventos que nunca deben entrar (instalaciones permanentes, etc.)
-# Matched case-insensitive against (title, source) pairs
+# Cada tupla: (substring en título, substring en source). Case-insensitive.
 GLOBAL_EXCLUDE = [
-    ("Julia", "Fundación Masaveu"),
+    ("julia", "masaveu"),
+    ("plensa", "masaveu"),
 ]
 
 logging.basicConfig(
@@ -57,9 +58,11 @@ def event_id(source: str, title: str, venue: str | None, date_start: str | None)
 
 
 def _is_excluded(e: dict) -> bool:
-    """Comprueba si un evento está en la lista de exclusión global."""
-    for title, source in GLOBAL_EXCLUDE:
-        if e.get("title", "").lower().strip() == title.lower() and e.get("source", "").lower().strip() == source.lower():
+    """Comprueba si un evento está en la lista de exclusión global (substring match)."""
+    t = e.get("title", "").lower()
+    s = e.get("source", "").lower()
+    for title_sub, source_sub in GLOBAL_EXCLUDE:
+        if title_sub in t and source_sub in s:
             return True
     return False
 
