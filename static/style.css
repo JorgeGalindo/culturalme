@@ -11,19 +11,19 @@
   --radius: 14px;
   --max-width: 720px;
 
-  /* Pastel Rainbow — kdesign.co #09 */
-  --museo-bg: #C9E4DE;
-  --museo-text: #3A6B5E;
-  --concierto-bg: #DBCDF0;
-  --concierto-text: #5A4478;
+  /* Pastel Rainbow */
+  --museo-bg: #FAEDCB;
+  --museo-text: #6B5A2E;
+  --concierto-bg: #C9E4DE;
+  --concierto-text: #3A6B5E;
   --galeria-bg: #C6DEF1;
   --galeria-text: #3A5E78;
-  --charla-bg: #FAEDCB;
-  --charla-text: #6B5A2E;
-  --cine-bg: #F7D9C4;
-  --cine-text: #7A4E38;
-  --teatro-bg: #F2C6DE;
-  --teatro-text: #784462;
+  --charla-bg: #DBCDF0;
+  --charla-text: #5A4478;
+  --cine-bg: #F2C6D3;
+  --cine-text: #784458;
+  --teatro-bg: #F7D9C4;
+  --teatro-text: #7A4E38;
 
   /* Brand */
   --brand-dark: #6B4F3A;
@@ -287,12 +287,12 @@ main {
 
 /* Tags — washed versions of the pastel rainbow */
 
-.tag-museo { color: var(--museo-text); background: #E4F2EF; }
-.tag-concierto { color: var(--concierto-text); background: #EDE6F8; }
+.tag-museo { color: var(--museo-text); background: #FDF6E5; }
+.tag-concierto { color: var(--concierto-text); background: #E4F2EF; }
 .tag-galeria { color: var(--galeria-text); background: #E3EEF8; }
-.tag-charla { color: var(--charla-text); background: #FCF6E5; }
-.tag-cine { color: var(--cine-text); background: #FCEDE2; }
-.tag-teatro { color: var(--teatro-text); background: #F9E3EF; }
+.tag-charla { color: var(--charla-text); background: #EDE6F8; }
+.tag-cine { color: var(--cine-text); background: #F9E3EC; }
+.tag-teatro { color: var(--teatro-text); background: #FCEDE2; }
 
 /* Venue + dates */
 
