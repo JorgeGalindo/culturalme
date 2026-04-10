@@ -227,7 +227,7 @@ def generate():
 
       return `<article class="card">
         <div class="card-title-row">
-          <h2>${{e.title}}</h2>
+          <h2>${{e.url ? '<a href="' + e.url + '" target="_blank" rel="noopener">' + e.title + '</a>' : e.title}}</h2>
           <div class="card-tag-badge">
             <span class="tag tag-${{e.section}}">${{picto(e.section)}} ${{LABELS[e.section]}}</span>
             ${{e.is_new ? '<span class="badge-new">nuevo</span>' : ''}}
@@ -240,7 +240,6 @@ def generate():
         </div>
         ${{e.artist_match ? '<p class="card-artist">' + e.artist_match + '</p>' : ''}}
         ${{e.description ? '<p class="card-description">' + e.description + '</p>' : ''}}
-        ${{e.url ? '<a href="' + e.url + '" target="_blank" rel="noopener" class="card-link">Fuente &#8599;</a>' : ''}}
       </article>`;
     }}).join('');
   }}

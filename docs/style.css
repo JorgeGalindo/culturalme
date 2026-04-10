@@ -252,6 +252,17 @@ main {
   flex: 1;
 }
 
+.card-title-row h2 a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.card-title-row h2 a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 .card-tag-badge {
   display: flex;
   align-items: center;
@@ -334,25 +345,6 @@ main {
   margin-top: 4px;
 }
 
-.card-link {
-  display: inline-block;
-  margin-top: 12px;
-  font-family: "Fraunces", serif;
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  text-decoration: none;
-  padding: 4px 12px;
-  border-radius: 24px;
-  border: 1.5px solid var(--border);
-  transition: all 0.18s ease;
-}
-
-.card-link:hover {
-  border-color: var(--cine-bg);
-  background: var(--cine-bg);
-  color: var(--cine-text);
-}
 
 /* Footer */
 
