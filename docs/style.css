@@ -1,0 +1,396 @@
+/* CulturalMe — Madrid */
+
+:root {
+  --bg: #FAF8F4;
+  --surface: #FFFFFF;
+  --text: #3A3632;
+  --text-desc: #5E5850;
+  --text-secondary: #9A948C;
+  --text-venue: #6E6860;
+  --border: #EDE9E3;
+  --radius: 14px;
+  --max-width: 720px;
+
+  /* Coolors pastel palette */
+  --rosa: #FFADAD;
+  --melocoton: #FFD6A5;
+  --amarillo: #FDFFB6;
+  --verde: #CAFFBF;
+  --cyan: #9BF6FF;
+  --azul: #A0C4FF;
+  --lila: #BDB2FF;
+  --fucsia: #FFC6FF;
+
+  /* Section colors from the palette */
+  --museo-bg: #CAFFBF;
+  --museo-text: #3D6B32;
+  --concierto-bg: #BDB2FF;
+  --concierto-text: #4A3D80;
+  --galeria-bg: #A0C4FF;
+  --galeria-text: #2E4F7A;
+  --charla-bg: #FDFFB6;
+  --charla-text: #6B6520;
+  --cine-bg: #FFADAD;
+  --cine-text: #7A2E2E;
+  --teatro-bg: #FFC6FF;
+  --teatro-text: #6B2E6B;
+
+  /* Brand */
+  --brand-dark: #6B4F3A;
+  --brand-light: #A8896B;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: "Fraunces", serif;
+  font-weight: 300;
+  font-optical-sizing: auto;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Pictograms */
+
+.picto {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.picto svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Header */
+
+header {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 56px 24px 28px;
+}
+
+header h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+header h1 .brand-c {
+  color: var(--brand-dark);
+}
+
+header h1 .brand-m {
+  color: var(--brand-light);
+}
+
+header .meta {
+  font-size: 0.8rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  margin-left: 6px;
+}
+
+/* Filter bar */
+
+.filter-bar {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-btn {
+  font-family: "Fraunces", serif;
+  font-size: 0.72rem;
+  font-weight: 400;
+  padding: 5px 12px;
+  border-radius: 24px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.filter-btn.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.filter-btn[data-section="museo"].active { background: var(--museo-bg); color: var(--museo-text); border-color: var(--museo-bg); }
+.filter-btn[data-section="concierto"].active { background: var(--concierto-bg); color: var(--concierto-text); border-color: var(--concierto-bg); }
+.filter-btn[data-section="galeria"].active { background: var(--galeria-bg); color: var(--galeria-text); border-color: var(--galeria-bg); }
+.filter-btn[data-section="charla"].active { background: var(--charla-bg); color: var(--charla-text); border-color: var(--charla-bg); }
+.filter-btn[data-section="cine"].active { background: var(--cine-bg); color: var(--cine-text); border-color: var(--cine-bg); }
+.filter-btn[data-section="teatro"].active { background: var(--teatro-bg); color: var(--teatro-text); border-color: var(--teatro-bg); }
+
+.filter-btn:not(.active):hover {
+  color: var(--text);
+  border-color: var(--text-secondary);
+}
+
+/* Per-section hover colors on filter buttons */
+.filter-btn[data-section="museo"]:not(.active):hover { background: var(--museo-bg); border-color: var(--museo-bg); color: var(--museo-text); }
+.filter-btn[data-section="concierto"]:not(.active):hover { background: var(--concierto-bg); border-color: var(--concierto-bg); color: var(--concierto-text); }
+.filter-btn[data-section="galeria"]:not(.active):hover { background: var(--galeria-bg); border-color: var(--galeria-bg); color: var(--galeria-text); }
+.filter-btn[data-section="charla"]:not(.active):hover { background: var(--charla-bg); border-color: var(--charla-bg); color: var(--charla-text); }
+.filter-btn[data-section="cine"]:not(.active):hover { background: var(--cine-bg); border-color: var(--cine-bg); color: var(--cine-text); }
+.filter-btn[data-section="teatro"]:not(.active):hover { background: var(--teatro-bg); border-color: var(--teatro-bg); color: var(--teatro-text); }
+
+/* Controls bar */
+
+.controls-bar {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.72rem;
+}
+
+.sort-links {
+  display: flex;
+  gap: 14px;
+}
+
+.sort-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 1.5px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.sort-links a.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+  font-weight: 500;
+}
+
+.sort-links a:hover { color: var(--text); }
+
+.venue-filter {
+  margin-left: auto;
+}
+
+.venue-select {
+  font-family: "Fraunces", serif;
+  font-size: 0.72rem;
+  font-weight: 400;
+  padding: 4px 28px 4px 10px;
+  border-radius: 24px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239A948C' stroke-width='1.2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  max-width: 200px;
+  transition: all 0.15s ease;
+}
+
+.venue-select:hover, .venue-select:focus {
+  border-color: var(--text-secondary);
+  color: var(--text);
+  outline: none;
+}
+
+/* Main */
+
+main {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px 60px;
+}
+
+.empty {
+  text-align: center;
+  padding: 80px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Cards */
+
+.card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin-bottom: 12px;
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.04);
+}
+
+.card-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.card-title-row h2 {
+  font-family: "Fraunces", serif;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.35;
+  flex: 1;
+}
+
+.card-tag-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.tag {
+  font-family: "Fraunces", serif;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-new {
+  font-family: "Fraunces", serif;
+  font-size: 0.56rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
+  border-radius: 24px;
+  background: var(--border);
+  color: var(--text-secondary);
+}
+
+/* Tags — washed out pastels (more alpha) */
+
+.tag-museo { color: #6B9460; background: #E5F2E1; }
+.tag-concierto { color: #7E6EA8; background: #EBE6F6; }
+.tag-galeria { color: #5E80A8; background: #E2EBF4; }
+.tag-charla { color: #908240; background: #F4F0DC; }
+.tag-cine { color: #A06E62; background: #F6E8E4; }
+.tag-teatro { color: #8E5E80; background: #F4E4EE; }
+
+/* Venue + dates */
+
+.card-dates {
+  font-size: 0.76rem;
+  font-weight: 400;
+  color: var(--text-venue);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.card-where {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.card-sep {
+  margin: 0 6px;
+  color: var(--border);
+}
+
+/* Description — more readable */
+
+.card-description {
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: var(--text-desc);
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+.card-artist {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--concierto-text);
+  margin-top: 4px;
+}
+
+.card-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-family: "Fraunces", serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 24px;
+  border: 1.5px solid var(--border);
+  transition: all 0.18s ease;
+}
+
+.card-link:hover {
+  border-color: var(--melocoton);
+  background: var(--melocoton);
+  color: var(--text);
+}
+
+/* Footer */
+
+footer {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  border-top: 1.5px solid var(--border);
+}
+
+/* Responsive */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  header { padding-top: 48px; }
+  .card { padding: 24px 26px; }
+}
+
+@media (max-width: 480px) {
+  header h1 { font-size: 1.5rem; }
+  .card-title-row h2 { font-size: 0.96rem; }
+  .card { padding: 16px 18px; border-radius: 10px; }
+  .venue-select { max-width: 140px; font-size: 0.68rem; }
+}
+
+@supports (padding: env(safe-area-inset-top)) {
+  header { padding-top: calc(56px + env(safe-area-inset-top)); }
+  footer { padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
+}

@@ -21,9 +21,11 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
+      - run: python generate.py
+
       - run: |
           git config user.name "culturalme-bot"
           git config user.email "bot@culturalme"
-          git add data/culturalme.db
+          git add data/culturalme.db docs/
           git diff --cached --quiet || git commit -m "update $(date +%Y-%m-%d)"
           git push
