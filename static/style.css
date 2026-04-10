@@ -11,29 +11,19 @@
   --radius: 14px;
   --max-width: 720px;
 
-  /* Coolors pastel palette */
-  --rosa: #FFADAD;
-  --melocoton: #FFD6A5;
-  --amarillo: #FDFFB6;
-  --verde: #CAFFBF;
-  --cyan: #9BF6FF;
-  --azul: #A0C4FF;
-  --lila: #BDB2FF;
-  --fucsia: #FFC6FF;
-
-  /* Section colors from the palette */
-  --museo-bg: #CAFFBF;
-  --museo-text: #3D6B32;
-  --concierto-bg: #BDB2FF;
-  --concierto-text: #4A3D80;
-  --galeria-bg: #A0C4FF;
-  --galeria-text: #2E4F7A;
-  --charla-bg: #FDFFB6;
-  --charla-text: #6B6520;
-  --cine-bg: #FFADAD;
-  --cine-text: #7A2E2E;
-  --teatro-bg: #FFC6FF;
-  --teatro-text: #6B2E6B;
+  /* Pastel Rainbow — kdesign.co #09 */
+  --museo-bg: #C9E4DE;
+  --museo-text: #3A6B5E;
+  --concierto-bg: #DBCDF0;
+  --concierto-text: #5A4478;
+  --galeria-bg: #C6DEF1;
+  --galeria-text: #3A5E78;
+  --charla-bg: #FAEDCB;
+  --charla-text: #6B5A2E;
+  --cine-bg: #F7D9C4;
+  --cine-text: #7A4E38;
+  --teatro-bg: #F2C6DE;
+  --teatro-text: #784462;
 
   /* Brand */
   --brand-dark: #6B4F3A;
@@ -295,14 +285,14 @@ main {
   color: var(--text-secondary);
 }
 
-/* Tags — washed out pastels (more alpha) */
+/* Tags — washed versions of the pastel rainbow */
 
-.tag-museo { color: #6B9460; background: #E5F2E1; }
-.tag-concierto { color: #7E6EA8; background: #EBE6F6; }
-.tag-galeria { color: #5E80A8; background: #E2EBF4; }
-.tag-charla { color: #908240; background: #F4F0DC; }
-.tag-cine { color: #A06E62; background: #F6E8E4; }
-.tag-teatro { color: #8E5E80; background: #F4E4EE; }
+.tag-museo { color: var(--museo-text); background: #E4F2EF; }
+.tag-concierto { color: var(--concierto-text); background: #EDE6F8; }
+.tag-galeria { color: var(--galeria-text); background: #E3EEF8; }
+.tag-charla { color: var(--charla-text); background: #FCF6E5; }
+.tag-cine { color: var(--cine-text); background: #FCEDE2; }
+.tag-teatro { color: var(--teatro-text); background: #F9E3EF; }
 
 /* Venue + dates */
 
@@ -359,9 +349,9 @@ main {
 }
 
 .card-link:hover {
-  border-color: var(--melocoton);
-  background: var(--melocoton);
-  color: var(--text);
+  border-color: var(--cine-bg);
+  background: var(--cine-bg);
+  color: var(--cine-text);
 }
 
 /* Footer */
