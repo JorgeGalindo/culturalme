@@ -217,6 +217,9 @@ def extract_events(url: str, source_name: str, section: str,
         if e.get("url") and not e["url"].startswith("http"):
             base = url.rsplit("/", 1)[0]
             e["url"] = base + "/" + e["url"].lstrip("/")
+        # Fallback: si no hay URL del evento, usar la URL de la fuente
+        if not e.get("url"):
+            e["url"] = url
 
     log.info("  %s: %d eventos extraídos via LLM", source_name, len(events))
     # Throttle para no pegarle al rate limit (50K tokens/min en tier básico)
