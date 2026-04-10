@@ -19,6 +19,14 @@ SALAS = [
     ("Moby Dick Club", "https://www.mobydickclub.com/"),
     ("La Riviera", "https://salariviera.com/"),
     ("Sala But", "https://www.salabut.es/"),
+    ("Clamores", "https://www.salaclamores.es/"),
+    ("Siroco", "https://siroco.es/"),
+    ("Independance Club", "https://independanceclub.com/"),
+    ("Shoko Madrid", "https://shokomadrid.com/"),
+    # JS-rendered (poco texto pero intentamos):
+    ("Café Berlín", "https://www.cafeberlin.es/"),
+    ("Galileo Galilei", "https://salagalileo.es/"),
+    ("Teatro Barceló", "https://teatrobarcelo.com/"),
 ]
 
 BANDSINTOWN_URL = "https://www.bandsintown.com/c/madrid-spain"
@@ -117,16 +125,28 @@ def _scrape_bandsintown(artists: set[str]) -> list[dict]:
     return matched
 
 
+def _dedup(events: list[dict]) -> list[dict]:
+    """Deduplica por artista + fecha (normalizado)."""
+    seen = set()
+    out = []
+    for e in events:
+        key = (_normalize(e.get("artist_match") or e["title"]), e.get("date_start") or "")
+        if key not in seen:
+            seen.add(key)
+            out.append(e)
+    return out
+
+
 def scrape(artists: set[str]) -> list[dict]:
     all_events = []
 
-    # Bandsintown — fuente principal
+    # Bandsintown — fuente principal (agregador con mejor cobertura)
     try:
         all_events.extend(_scrape_bandsintown(artists))
     except Exception:
         log.exception("  ✗ Error scraping Bandsintown")
 
-    # Salas individuales — complemento
+    # Salas individuales — complemento, puede encontrar cosas que Bandsintown no tiene
     for name, url in SALAS:
         try:
             events = extract_events(url, source_name=name, section="concierto")
@@ -135,5 +155,11 @@ def scrape(artists: set[str]) -> list[dict]:
             log.info("  %s: %d eventos, %d match", name, len(events), len(matched))
         except Exception:
             log.exception("  ✗ Error scraping %s", name)
+
+    # Deduplicar (mismo artista + misma fecha = mismo concierto)
+    before = len(all_events)
+    all_events = _dedup(all_events)
+    if before > len(all_events):
+        log.info("  Dedup: %d → %d conciertos", before, len(all_events))
 
     return all_events

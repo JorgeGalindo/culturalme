@@ -9,12 +9,14 @@ from scrapers.llm import extract_events
 log = logging.getLogger(__name__)
 
 FUENTES = [
-    # Del Pino redirige /actividades/ a home, pero la home tiene "Próximos eventos"
     ("Fundación Rafael del Pino", "https://frdelpino.es/"),
     ("Fundación Ramón Areces", "https://www.fundacionareces.es/fundacionareces/es/actividades/"),
     ("Fundación Juan March", "https://www.march.es/es/madrid/actividades"),
     ("Ateneo de Madrid", "https://www.ateneodemadrid.com/actividades"),
     ("CBA", "https://www.circulobellasartes.com/agenda/"),
+    ("Casa Árabe", "https://casaarabe.es/eventos"),
+    ("IE Foundation", "https://www.ie.edu/es/fundacion-ie/"),
+    ("Fundación Telefónica", "https://espacio.fundaciontelefonica.com/agenda/"),
 ]
 
 
