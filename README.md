@@ -22,7 +22,7 @@ viernes 7AM CET
   GitHub Pages se actualiza automaticamente
 ```
 
-No hay servidor. No hay Flask en produccion. Todo es un HTML estatico con JS vanilla para los filtros.
+No hay servidor. No hay Flask en produccion. Todo es un HTML estatico con JS vanilla para los filtros y el estado "Visto" (localStorage).
 
 ## Fuentes
 
@@ -56,6 +56,7 @@ Teatros del Canal, Teatro Espanol, Teatro de la Abadia, Naves del Espanol (Matad
 - **GitHub Pages** — hosting (gratis)
 - **Fraunces** — tipografia
 - Paleta pastel rainbow
+- **localStorage** — estado "Visto" persistente por evento
 
 ## Estructura
 
@@ -99,6 +100,14 @@ python pipeline.py    # scrape todo
 python generate.py    # genera docs/index.html
 open docs/index.html  # ver resultado
 ```
+
+## Funcionalidades
+
+- Filtros por seccion (museo, concierto, galeria, charla, cine, teatro)
+- Orden por fecha o por mas reciente
+- Filtro por sede
+- Boton "Visto" por evento: marca eventos ya vistos, se guardan en localStorage, se muestran atenuados y al final de cualquier listado
+- Badge "nuevo" para eventos recien detectados
 
 ## Pendiente
 
