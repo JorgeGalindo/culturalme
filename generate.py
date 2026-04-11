@@ -99,7 +99,7 @@ def generate():
 
   <div class="controls-bar">
     <div class="sort-links">
-      <a href="#" class="active" data-sort="nuevo" onclick="setSort('nuevo')">Mas nuevo</a>
+      <a href="#" class="active" data-sort="nuevo" onclick="setSort('nuevo')">Más nuevo</a>
       <a href="#" data-sort="fecha" onclick="setSort('fecha')">Por fecha</a>
     </div>
     <div class="venue-filter">
@@ -132,6 +132,18 @@ def generate():
   let currentSection = 'all';
   let currentSort = 'nuevo';
 
+  function seenKey(e) {{ return e.title + '||' + e.section; }}
+  function getSeen() {{ try {{ return JSON.parse(localStorage.getItem('culturalme_seen') || '[]'); }} catch {{ return []; }} }}
+  function isSeen(e) {{ return getSeen().includes(seenKey(e)); }}
+  function toggleSeen(e) {{
+    let s = getSeen();
+    const k = seenKey(e);
+    if (s.includes(k)) s = s.filter(x => x !== k);
+    else s.push(k);
+    localStorage.setItem('culturalme_seen', JSON.stringify(s));
+    render();
+  }}
+
   function picto(s) {{ return '<span class="picto">' + PICTOS[s] + '</span>'; }}
 
   function buildFilters() {{
@@ -163,14 +175,21 @@ def generate():
     }});
 
     // Sort
+    const seenSet = new Set(getSeen());
     if (currentSort === 'fecha') {{
       filtered.sort((a, b) => {{
+        const sa = seenSet.has(seenKey(a)) ? 1 : 0;
+        const sb = seenSet.has(seenKey(b)) ? 1 : 0;
+        if (sa !== sb) return sa - sb;
         const da = a.date_end || a.date_start || '9999-12-31';
         const db = b.date_end || b.date_start || '9999-12-31';
         return da.localeCompare(db) || (b.first_seen || '').localeCompare(a.first_seen || '');
       }});
     }} else {{
       filtered.sort((a, b) => {{
+        const sa = seenSet.has(seenKey(a)) ? 1 : 0;
+        const sb = seenSet.has(seenKey(b)) ? 1 : 0;
+        if (sa !== sb) return sa - sb;
         const fa = b.first_seen || '';
         const fb = a.first_seen || '';
         if (fa !== fb) return fa.localeCompare(fb);
@@ -225,7 +244,8 @@ def generate():
       else if (e.date_start) dateStr = e.date_start;
       else if (e.date_end) dateStr = 'Hasta ' + e.date_end;
 
-      return `<article class="card">
+      const seen = isSeen(e);
+      return `<article class="card${{seen ? ' seen' : ''}}">
         <div class="card-title-row">
           <h2>${{e.url ? '<a href="' + e.url + '" target="_blank" rel="noopener">' + e.title + '</a>' : e.title}}</h2>
           <div class="card-tag-badge">
@@ -240,6 +260,9 @@ def generate():
         </div>
         ${{e.artist_match ? '<p class="card-artist">' + e.artist_match + '</p>' : ''}}
         ${{e.description ? '<p class="card-description">' + e.description + '</p>' : ''}}
+        <div class="card-bottom">
+          <button class="btn-seen ${{seen ? 'active' : ''}}" onclick="toggleSeen(EVENTS[${{EVENTS.indexOf(e)}}])">Visto</button>
+        </div>
       </article>`;
     }}).join('');
   }}

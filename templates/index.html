@@ -45,7 +45,7 @@
   <div class="controls-bar">
     <div class="sort-links">
       <a href="/?section={{ current_section }}&sort=nuevo{% if current_venue %}&venue={{ current_venue }}{% endif %}"
-         class="{{ 'active' if current_sort == 'nuevo' }}">Mas nuevo</a>
+         class="{{ 'active' if current_sort == 'nuevo' }}">Más nuevo</a>
       <a href="/?section={{ current_section }}&sort=fecha{% if current_venue %}&venue={{ current_venue }}{% endif %}"
          class="{{ 'active' if current_sort == 'fecha' }}">Por fecha</a>
     </div>
@@ -69,7 +69,7 @@
     {% endif %}
 
     {% for event in events %}
-    <article class="card">
+    <article class="card" data-seen-key="{{ event.title }}||{{ event.section }}">
       <div class="card-title-row">
         <h2>{{ event.title }}</h2>
         <div class="card-tag-badge">
@@ -101,6 +101,9 @@
       {% if event.url %}
       <a href="{{ event.url }}" target="_blank" rel="noopener" class="card-link">Fuente &#8599;</a>
       {% endif %}
+      <div class="card-bottom">
+        <button class="btn-seen" onclick="toggleSeen(this)">Visto</button>
+      </div>
     </article>
     {% endfor %}
   </main>
@@ -118,6 +121,48 @@
     else { url.searchParams.delete('venue'); }
     window.location = url;
   }
+
+  function getSeen() { try { return JSON.parse(localStorage.getItem('culturalme_seen') || '[]'); } catch { return []; } }
+
+  function toggleSeen(btn) {
+    const card = btn.closest('.card');
+    const key = card.dataset.seenKey;
+    let s = getSeen();
+    if (s.includes(key)) {
+      s = s.filter(x => x !== key);
+      card.classList.remove('seen');
+      btn.classList.remove('active');
+    } else {
+      s.push(key);
+      card.classList.add('seen');
+      btn.classList.add('active');
+    }
+    localStorage.setItem('culturalme_seen', JSON.stringify(s));
+    reorderCards();
+  }
+
+  function reorderCards() {
+    const main = document.querySelector('main');
+    const cards = [...main.querySelectorAll('.card')];
+    cards.sort((a, b) => {
+      const sa = a.classList.contains('seen') ? 1 : 0;
+      const sb = b.classList.contains('seen') ? 1 : 0;
+      return sa - sb;
+    });
+    cards.forEach(c => main.appendChild(c));
+  }
+
+  // Apply seen state on page load
+  (function() {
+    const seen = getSeen();
+    document.querySelectorAll('.card').forEach(card => {
+      if (seen.includes(card.dataset.seenKey)) {
+        card.classList.add('seen');
+        card.querySelector('.btn-seen').classList.add('active');
+      }
+    });
+    reorderCards();
+  })();
   </script>
 </body>
 </html>
