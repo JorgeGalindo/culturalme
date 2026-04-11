@@ -181,7 +181,7 @@
         ${e.artist_match ? '<p class="card-artist">' + e.artist_match + '</p>' : ''}
         ${e.description ? '<p class="card-description">' + e.description + '</p>' : ''}
         <div class="card-bottom">
-          <button class="btn-seen ${seen ? 'active' : ''}" onclick="toggleSeen(EVENTS[${EVENTS.indexOf(e)}])">Visto</button>
+          <button class="btn-seen ${seen ? 'active' : ''}" onclick="toggleSeen(EVENTS[${EVENTS.indexOf(e)}])">${seen ? '✓ Visto' : 'Visto'}</button>
         </div>
       </article>`;
     }).join('');

@@ -103,6 +103,7 @@
       {% endif %}
       <div class="card-bottom">
         <button class="btn-seen" onclick="toggleSeen(this)">Visto</button>
+
       </div>
     </article>
     {% endfor %}
@@ -132,10 +133,12 @@
       s = s.filter(x => x !== key);
       card.classList.remove('seen');
       btn.classList.remove('active');
+      btn.textContent = 'Visto';
     } else {
       s.push(key);
       card.classList.add('seen');
       btn.classList.add('active');
+      btn.textContent = '✓ Visto';
     }
     localStorage.setItem('culturalme_seen', JSON.stringify(s));
     reorderCards();
@@ -158,7 +161,9 @@
     document.querySelectorAll('.card').forEach(card => {
       if (seen.includes(card.dataset.seenKey)) {
         card.classList.add('seen');
-        card.querySelector('.btn-seen').classList.add('active');
+        const btn = card.querySelector('.btn-seen');
+        btn.classList.add('active');
+        btn.textContent = '✓ Visto';
       }
     });
     reorderCards();

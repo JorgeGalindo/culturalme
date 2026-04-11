@@ -248,31 +248,42 @@ main {
 .card-bottom {
   display: flex;
   justify-content: flex-end;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .btn-seen {
   font-family: "Fraunces", serif;
   font-size: 0.62rem;
-  font-weight: 500;
-  padding: 3px 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 11px;
   border-radius: 24px;
   border: 1.5px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .btn-seen:hover {
+  background: var(--bg);
   border-color: var(--text-secondary);
   color: var(--text);
 }
 
 .btn-seen.active {
-  background: var(--border);
-  color: var(--text-secondary);
-  border-color: var(--border);
+  background: var(--concierto-bg);
+  color: var(--concierto-text);
+  border-color: var(--concierto-bg);
+}
+
+.btn-seen.active:hover {
+  background: #b8d9d1;
+  border-color: #b8d9d1;
 }
 
 .card-title-row {
