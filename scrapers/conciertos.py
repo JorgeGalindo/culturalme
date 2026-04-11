@@ -10,6 +10,8 @@ import re
 import time
 import unicodedata
 
+import httpx
+
 from scrapers.llm import extract_events, fetch_html, _clean_html, client, FETCH_HEADERS
 
 log = logging.getLogger(__name__)
@@ -30,6 +32,8 @@ SALAS = [
 ]
 
 BANDSINTOWN_URL = "https://www.bandsintown.com/c/madrid-spain"
+DICE_API_URL = "https://events-api.dice.fm/v1/events"
+DICE_API_KEY = "7vYeaK9Zfi9aC94moLEF88rfLtnhicFH1q1Mb5Q8"
 
 BANDSINTOWN_PROMPT = """\
 Extrae TODOS los conciertos y eventos musicales de este texto de Bandsintown.
@@ -125,6 +129,47 @@ def _scrape_bandsintown(artists: set[str]) -> list[dict]:
     return matched
 
 
+def _scrape_dice(artists: set[str]) -> list[dict]:
+    """Scrape DICE Madrid via API y filtra contra lista de artistas."""
+    all_events = []
+    page = 1
+    while True:
+        resp = httpx.get(
+            DICE_API_URL,
+            params={"filter[cities]": "madrid", "page[size]": 50, "page[number]": page},
+            headers={"x-api-key": DICE_API_KEY},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        events = data.get("data", [])
+        if not events:
+            break
+
+        for ev in events:
+            venue = ev.get("venue") or ""
+            date_str = (ev.get("date") or "")[:10] or None
+            all_events.append({
+                "title": ev.get("name", ""),
+                "source": venue or "DICE",
+                "section": "concierto",
+                "venue": venue,
+                "date_start": date_str,
+                "description": None,
+                "url": ev.get("url") or f"https://dice.fm/event/{ev.get('perm_name', '')}",
+            })
+
+        if not data.get("links", {}).get("next"):
+            break
+        page += 1
+
+    log.info("  DICE: %d conciertos totales en Madrid", len(all_events))
+
+    matched = _match_artists(all_events, artists)
+    log.info("  DICE: %d matchean con tu lista de artistas", len(matched))
+    return matched
+
+
 def _dedup(events: list[dict]) -> list[dict]:
     """Deduplica por artista + fecha (normalizado)."""
     seen = set()
@@ -145,6 +190,12 @@ def scrape(artists: set[str]) -> list[dict]:
         all_events.extend(_scrape_bandsintown(artists))
     except Exception:
         log.exception("  ✗ Error scraping Bandsintown")
+
+    # DICE — agregador con API JSON
+    try:
+        all_events.extend(_scrape_dice(artists))
+    except Exception:
+        log.exception("  ✗ Error scraping DICE")
 
     # Salas individuales — complemento, puede encontrar cosas que Bandsintown no tiene
     for name, url in SALAS:

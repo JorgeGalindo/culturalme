@@ -26,11 +26,11 @@ No hay servidor. No hay Flask en produccion. Todo es un HTML estatico con JS van
 
 ## Fuentes
 
-### Museos y exposiciones (17)
-Prado, Reina Sofia, Thyssen, Matadero, F. Telefonica, La Casa Encendida, F. Mapfre, Canal de Isabel II, Conde Duque, CBA, F. ICO, Real Academia de San Fernando, CentroCentro, Alcala 31, F. Masaveu, Artes Decorativas, Cerralbo, F. Juan March
+### Museos y exposiciones (18)
+Prado, Reina Sofia, Thyssen, Matadero, F. Telefonica, La Casa Encendida, F. Mapfre, Canal de Isabel II, Conde Duque, CBA, F. ICO, Real Academia de San Fernando, CentroCentro, Alcala 31, F. Masaveu, Artes Decorativas, Cerralbo, F. Juan March, Lazaro Galdiano
 
-### Conciertos (12 salas + Bandsintown)
-**Bandsintown** como agregador principal (filtra contra lista de 4000 artistas).
+### Conciertos (12 salas + Bandsintown + DICE)
+**Bandsintown** y **DICE** (API REST) como agregadores principales (filtran contra lista de 4000 artistas).
 Salas: El Sol, Moby Dick, La Riviera, Sala But, Clamores, Siroco, Independance, Shoko, Cafe Berlin, Galileo Galilei, Teatro Barcelo.
 Deduplicacion por artista + fecha.
 
@@ -42,7 +42,7 @@ Ferias: ARCO, Art Madrid, JustMAD, Estampa, Gallery Weekend.
 F. Rafael del Pino, F. Ramon Areces, F. Juan March, Ateneo, CBA, Casa Arabe, IE Foundation, F. Telefonica.
 
 ### Cine
-Cines Renoir (todas las sedes Madrid). Director y etiquetas (ESTRENO, OSCAR...).
+Cines Renoir (todas las sedes Madrid) y Cines Embajadores. Director y etiquetas (ESTRENO, OSCAR...).
 
 ### Teatro (8)
 Teatros del Canal, Teatro Espanol, Teatro de la Abadia, Naves del Espanol (Matadero), Teatro del Barrio, Nave 73, Sala Cuarta Pared, Sala Triangulo.
@@ -111,6 +111,6 @@ open docs/index.html  # ver resultado
 
 ## Pendiente
 
-- Playwright para webs JS-rendered: CaixaForum, Lazaro Galdiano, Cine Embajadores, DICE
+- CaixaForum: Cloudflare bloquea requests, necesita Playwright o alternativa
 - CDN y CNTC cuando arreglen sus dominios
 - Mas galerias (muchas son muy minimalistas y dan 0)

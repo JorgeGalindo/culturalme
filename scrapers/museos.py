@@ -34,9 +34,7 @@ FUENTES = [
     ("Museo de Artes Decorativas", "https://www.culturaydeporte.gob.es/mnartesdecorativas/exposiciones/actuales.html"),
     ("Museo Cerralbo", "https://www.culturaydeporte.gob.es/mcerralbo/actividades/programacion-en-curso.html"),
     ("Fundación Juan March", "https://www.march.es/es/madrid/exposiciones"),
-    # Lázaro Galdiano: web JS-rendered, httpx no puede extraer contenido.
-    # TODO: probar con playwright si se añade, o buscar feed/API.
-    # ("Museo Lázaro Galdiano", "https://www.museolazarogaldiano.es/actividades"),
+    ("Museo Lázaro Galdiano", "https://www.museolazarogaldiano.es/actividades/exposiciones"),
 ]
 
 

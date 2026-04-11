@@ -77,10 +77,62 @@ def _scrape_renoir() -> list[dict]:
     return events
 
 
+def _scrape_embajadores() -> list[dict]:
+    """Cines Embajadores — cartelera Madrid."""
+    html = fetch_html("https://cinesembajadores.es/madrid/")
+    cleaned = _clean_html(html)
+
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": CINE_PROMPT.format(text=cleaned)}],
+    )
+
+    text = response.content[0].text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+
+    try:
+        films = json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r'\[.*\]', text, re.S)
+        films = json.loads(match.group()) if match else []
+
+    events = []
+    for f in films:
+        director = f.get("director") or ""
+        tags = f.get("tags") or ""
+        desc_parts = []
+        if director:
+            desc_parts.append(f"Dir: {director}")
+        if tags:
+            desc_parts.append(tags if isinstance(tags, str) else ", ".join(tags))
+
+        events.append({
+            "title": f["title"],
+            "source": "Cines Embajadores",
+            "section": "cine",
+            "venue": "Cines Embajadores",
+            "description": " — ".join(desc_parts) if desc_parts else None,
+            "url": "https://cinesembajadores.es/madrid/",
+        })
+
+    log.info("  Cines Embajadores: %d películas", len(events))
+    time.sleep(3)
+    return events
+
+
 def scrape() -> list[dict]:
     all_events = []
     try:
         all_events.extend(_scrape_renoir())
     except Exception:
         log.exception("  ✗ Error scraping Cines Renoir")
+    try:
+        all_events.extend(_scrape_embajadores())
+    except Exception:
+        log.exception("  ✗ Error scraping Cines Embajadores")
     return all_events
