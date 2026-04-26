@@ -3,23 +3,28 @@ name: Weekly update
 on:
   schedule:
     - cron: '0 5 * * 5'  # Viernes 05:00 UTC = 07:00 CET
-  workflow_dispatch: {}    # Poder lanzarlo a mano
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+          cache: pip
 
       - run: pip install -r requirements.txt
 
       - run: python pipeline.py
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DICE_API_KEY: ${{ secrets.DICE_API_KEY }}
 
       - run: python generate.py
 
@@ -27,5 +32,6 @@ jobs:
           git config user.name "culturalme-bot"
           git config user.email "bot@culturalme"
           git add data/culturalme.db docs/
-          git diff --cached --quiet || git commit -m "update $(date +%Y-%m-%d)"
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "update $(date +%Y-%m-%d)"
           git push

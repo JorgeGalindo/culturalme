@@ -96,10 +96,19 @@ culturalme/
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
+export DICE_API_KEY=...        # opcional, para fuente DICE
 python pipeline.py    # scrape todo
 python generate.py    # genera docs/index.html
 open docs/index.html  # ver resultado
 ```
+
+## Setup CI (GitHub Actions)
+
+El cron necesita dos cosas en el repo:
+
+1. **Secret `ANTHROPIC_API_KEY`** — Settings → Secrets and variables → Actions → New repository secret.
+2. **Secret `DICE_API_KEY`** (opcional) — si no está, DICE se salta sin error.
+3. **Permisos de escritura** — `permissions: contents: write` ya está en el workflow; no hace falta tocar nada en GitHub si el repo permite que las Actions escriban (Settings → Actions → General → Workflow permissions).
 
 ## Funcionalidades
 

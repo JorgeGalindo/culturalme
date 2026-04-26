@@ -1,10 +1,11 @@
 """
 Extracción de eventos via Claude Haiku.
-Módulo compartido por museos, galerías y salas de conciertos.
+Módulo compartido por todos los scrapers.
 """
 
 import json
 import logging
+import os
 import re
 import time
 
@@ -14,7 +15,26 @@ from bs4 import BeautifulSoup
 
 log = logging.getLogger(__name__)
 
-client = anthropic.Anthropic()
+MODEL = "claude-haiku-4-5-20251001"
+THROTTLE_SECONDS = 3  # 50K tokens/min en tier básico
+MAX_HTML_CHARS = 30_000
+
+_client: anthropic.Anthropic | None = None
+
+
+def _get_client() -> anthropic.Anthropic:
+    """Lazy init: error claro si falta ANTHROPIC_API_KEY."""
+    global _client
+    if _client is None:
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY no está definida. "
+                "En local: export ANTHROPIC_API_KEY=sk-ant-... "
+                "En GitHub Actions: añádela en Settings → Secrets and variables → Actions."
+            )
+        _client = anthropic.Anthropic()
+    return _client
+
 
 EXTRACTION_PROMPTS = {
     "default": """\
@@ -120,11 +140,11 @@ def fetch_html(url: str, retries: int = 3) -> str:
     last_err = None
     for attempt in range(retries):
         try:
-            resp = httpx.get(url, follow_redirects=True, timeout=45, verify=False,
+            resp = httpx.get(url, follow_redirects=True, timeout=45,
                              headers=FETCH_HEADERS)
             resp.raise_for_status()
             return resp.text
-        except (httpx.HTTPStatusError, httpx.TimeoutException) as e:
+        except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.TransportError) as e:
             last_err = e
             if attempt < retries - 1:
                 wait = 5 * (attempt + 1)
@@ -134,94 +154,91 @@ def fetch_html(url: str, retries: int = 3) -> str:
     raise last_err
 
 
-def _clean_html(raw_html: str) -> str:
-    """Limpia HTML: quita scripts, styles, nav, footer, y devuelve texto útil con URLs de imagen."""
+def clean_html(raw_html: str) -> str:
+    """Limpia HTML: quita scripts, styles, nav, footer, devuelve texto plano."""
     soup = BeautifulSoup(raw_html, "lxml")
 
-    # Eliminar elementos que no aportan contenido
     for tag in soup.find_all(["script", "style", "noscript", "svg", "iframe",
                               "nav", "footer", "header"]):
         tag.decompose()
 
-    # Intentar extraer solo el contenido principal
-    main = soup.find("main") or soup.find("article") or soup.find(id="content") or soup.find(class_="content")
-    if main:
-        text = main.get_text(separator="\n", strip=True)
-    else:
-        text = soup.get_text(separator="\n", strip=True)
+    main = (soup.find("main") or soup.find("article")
+            or soup.find(id="content") or soup.find(class_="content"))
+    text = (main or soup).get_text(separator="\n", strip=True)
 
-    # Colapsar líneas vacías
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
+def call_llm_for_json(prompt: str, max_tokens: int = 8192) -> list[dict]:
+    """Llama a Haiku con `prompt`, parsea la respuesta como JSON array.
+
+    Robusto a respuestas envueltas en ```json ... ``` y a texto extra
+    alrededor del array. Throttle de THROTTLE_SECONDS al final para no
+    pegarle al rate limit.
+    """
+    client = _get_client()
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    text = response.content[0].text.strip()
+
+    # Quita ```json ... ``` o ``` ... ``` envoltorios
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+
+    try:
+        result = json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\[.*\]", text, re.S)
+        if not match:
+            log.warning("  No se pudo parsear JSON de la respuesta LLM")
+            time.sleep(THROTTLE_SECONDS)
+            return []
+        result = json.loads(match.group())
+
+    time.sleep(THROTTLE_SECONDS)
+    return result if isinstance(result, list) else []
 
 
 def extract_events(url: str, source_name: str, section: str,
                     truncate_before: str | None = None) -> list[dict]:
     """Descarga HTML, limpia, y usa Haiku para extraer eventos.
 
-    truncate_before: si se especifica, corta el texto justo antes de esta cadena.
-        Útil para webs que listan expos pasadas después de las actuales.
-        Se busca la SEGUNDA ocurrencia (la primera suele ser un menú/nav).
+    truncate_before: corta el texto antes de la SEGUNDA aparición de la
+    cadena (la primera suele ser un menú). Útil para webs que listan
+    expos pasadas tras las actuales.
     """
     html = fetch_html(url)
+    cleaned = clean_html(html)
 
-    # Limpiar HTML antes de enviar a Haiku — reduce tokens drásticamente
-    cleaned = _clean_html(html)
-
-    # Cortar antes de una sección no deseada (ej. "Pasadas")
     if truncate_before:
-        # Buscar la segunda ocurrencia (la primera suele ser menú)
         first = cleaned.find(truncate_before)
         if first >= 0:
             second = cleaned.find(truncate_before, first + len(truncate_before))
             cut_at = second if second >= 0 else first
-            if cut_at > 100:  # solo cortar si hay contenido antes
+            if cut_at > 100:
                 cleaned = cleaned[:cut_at]
 
-    # Truncar si aún es muy largo
-    if len(cleaned) > 30_000:
-        cleaned = cleaned[:30_000]
+    if len(cleaned) > MAX_HTML_CHARS:
+        cleaned = cleaned[:MAX_HTML_CHARS]
 
-    # Seleccionar prompt específico por sección
     prompt_template = EXTRACTION_PROMPTS.get(section, EXTRACTION_PROMPTS["default"])
-
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=8192,
-        messages=[{"role": "user", "content": prompt_template.format(html=cleaned)}],
-    )
-
-    text = response.content[0].text.strip()
-    # Limpiar posible markdown wrapping
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
-
-    try:
-        events = json.loads(text)
-    except json.JSONDecodeError:
-        # Intentar extraer el primer array JSON válido del texto
-        match = re.search(r'\[.*\]', text, re.S)
-        if match:
-            events = json.loads(match.group())
-        else:
-            log.warning("  %s: no se pudo parsear JSON de la respuesta LLM", source_name)
-            events = []
+    events = call_llm_for_json(prompt_template.format(html=cleaned))
 
     for e in events:
         e["source"] = source_name
         e["section"] = section
-        # Asegurar que url sea absoluta si es relativa
         if e.get("url") and not e["url"].startswith("http"):
             base = url.rsplit("/", 1)[0]
             e["url"] = base + "/" + e["url"].lstrip("/")
-        # Fallback: si no hay URL del evento, usar la URL de la fuente
         if not e.get("url"):
             e["url"] = url
 
     log.info("  %s: %d eventos extraídos via LLM", source_name, len(events))
-    # Throttle para no pegarle al rate limit (50K tokens/min en tier básico)
-    time.sleep(3)
     return events
