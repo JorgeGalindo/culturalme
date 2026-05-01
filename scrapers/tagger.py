@@ -19,18 +19,35 @@ from scrapers.llm import MODEL, THROTTLE_SECONDS, _get_client
 log = logging.getLogger(__name__)
 
 TASTE_PATH = Path(__file__).parent.parent / "data" / "jorge_taste.md"
-TAGGER_VERSION = "v1"
+TAGGER_VERSION = "v2"
 BATCH_SIZE = 40
 
 
 KIDS_RULES = """\
-"kids_friendly": 1 si el evento es claramente disfrutable por niños de 5-10 años:
-cuentacuentos, talleres familiares, espectáculos infantiles, exposiciones interactivas
-para todos los públicos, cine familiar, conciertos con etiqueta "todos los públicos".
-Cualquier evento explícitamente "infantil" o "familiar" en título/descripción → 1.
-"kids_friendly": 0 en cualquier otro caso: arte contemporáneo conceptual, charlas
-técnicas, conciertos de noche en sala, teatro adulto, cine de autor sin marca de
-"todos los públicos". Ante duda, 0.
+Piensa en un niño de 7-12 años con curiosidad por el arte y la cultura.
+"kids_friendly": 1 si el evento puede disfrutarlo sin aburrirse y sin contenido inadecuado.
+Incluye:
+  - Cualquier evento explícitamente "infantil", "familiar", "todos los públicos".
+  - Cuentacuentos, talleres familiares, espectáculos infantiles.
+  - Exposiciones de pintura figurativa, retrato, paisaje, escena urbana, ilustración
+    (Hopper, Sorolla, Goya, Picasso, Velázquez, Antonio López, Hockney, Banksy y similares).
+  - Exposiciones de fotografía documental, retrato, naturaleza, viajes (Cartier-Bresson,
+    Salgado, National Geographic, etc.).
+  - Exposiciones de escultura, arquitectura, diseño, moda, cómic, ilustración, cine
+    (props, storyboards), juguetes históricos, civilizaciones antiguas, dinosaurios,
+    arte oriental, máscaras, instrumentos.
+  - Cine de autor con marca "todos los públicos" o claramente apto.
+  - Conciertos diurnos al aire libre, música clásica para todos los públicos.
+"kids_friendly": 0 si:
+  - Arte contemporáneo conceptual, instalación de vídeo/sonido sin estímulo visual claro,
+    performance, abstracción radical sin narrativa.
+  - Contenido adulto (desnudo erótico explícito, violencia gráfica, drogas, política
+    militante).
+  - Charlas técnicas, mesas redondas, debates de policy/economía/filosofía.
+  - Conciertos en sala de noche (rock, indie, rap, electrónica en club).
+  - Teatro adulto, cine de autor "no recomendada" o con tema duro.
+  - Cualquier evento que un niño de 10 años no podría seguir ni media hora.
+Ante duda razonable a favor: marca 1. La duda fuerte: 0.
 Este criterio NO depende del manifiesto."""
 
 
