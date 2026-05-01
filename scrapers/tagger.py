@@ -19,36 +19,26 @@ from scrapers.llm import MODEL, THROTTLE_SECONDS, _get_client
 log = logging.getLogger(__name__)
 
 TASTE_PATH = Path(__file__).parent.parent / "data" / "jorge_taste.md"
-TAGGER_VERSION = "v2"
+KIDS_PATH = Path(__file__).parent.parent / "data" / "kids_taste.md"
+TAGGER_VERSION = "v3"
 BATCH_SIZE = 40
 
 
-KIDS_RULES = """\
-Piensa en un niño de 7-12 años con curiosidad por el arte y la cultura.
-"kids_friendly": 1 si el evento puede disfrutarlo sin aburrirse y sin contenido inadecuado.
-Incluye:
-  - Cualquier evento explícitamente "infantil", "familiar", "todos los públicos".
-  - Cuentacuentos, talleres familiares, espectáculos infantiles.
-  - Exposiciones de pintura figurativa, retrato, paisaje, escena urbana, ilustración
-    (Hopper, Sorolla, Goya, Picasso, Velázquez, Antonio López, Hockney, Banksy y similares).
-  - Exposiciones de fotografía documental, retrato, naturaleza, viajes (Cartier-Bresson,
-    Salgado, National Geographic, etc.).
-  - Exposiciones de escultura, arquitectura, diseño, moda, cómic, ilustración, cine
-    (props, storyboards), juguetes históricos, civilizaciones antiguas, dinosaurios,
-    arte oriental, máscaras, instrumentos.
-  - Cine de autor con marca "todos los públicos" o claramente apto.
-  - Conciertos diurnos al aire libre, música clásica para todos los públicos.
-"kids_friendly": 0 si:
-  - Arte contemporáneo conceptual, instalación de vídeo/sonido sin estímulo visual claro,
-    performance, abstracción radical sin narrativa.
-  - Contenido adulto (desnudo erótico explícito, violencia gráfica, drogas, política
-    militante).
-  - Charlas técnicas, mesas redondas, debates de policy/economía/filosofía.
-  - Conciertos en sala de noche (rock, indie, rap, electrónica en club).
-  - Teatro adulto, cine de autor "no recomendada" o con tema duro.
-  - Cualquier evento que un niño de 10 años no podría seguir ni media hora.
-Ante duda razonable a favor: marca 1. La duda fuerte: 0.
-Este criterio NO depende del manifiesto."""
+def _kids_rules(kids_manifesto: str | None) -> str:
+    if not kids_manifesto:
+        return (
+            '"kids_friendly": 0 siempre (no hay data/kids_taste.md cargado).'
+        )
+    return (
+        'Decide "kids_friendly" según el siguiente manifiesto, que describe a DOS '
+        'niños concretos (no un niño genérico). Aplica estrictamente la "Regla de '
+        'decisión". Mapeo binario para "kids_friendly":\n'
+        '  - "kids: sí" del manifiesto → 1\n'
+        '  - "kids: depende" del manifiesto → 1 (lo dejamos visible para que el '
+        'lector decida en la tarjeta)\n'
+        '  - "kids: no" del manifiesto → 0\n\n'
+        f"--- MANIFIESTO KIDS ---\n{kids_manifesto}\n--- FIN MANIFIESTO ---"
+    )
 
 
 def _selective_rules(taste: str | None) -> str:
@@ -61,7 +51,8 @@ def _selective_rules(taste: str | None) -> str:
     )
 
 
-def _build_prompt(events: list[dict], taste: str | None) -> str:
+def _build_prompt(events: list[dict], taste: str | None,
+                   kids_manifesto: str | None) -> str:
     payload = [
         {
             "i": i,
@@ -76,7 +67,7 @@ def _build_prompt(events: list[dict], taste: str | None) -> str:
 Para cada evento del array, devuelve un objeto con dos flags binarios.
 
 KIDS_FRIENDLY:
-{KIDS_RULES}
+{_kids_rules(kids_manifesto)}
 
 SELECTIVE:
 {_selective_rules(taste)}
@@ -91,9 +82,9 @@ Eventos:
 """
 
 
-def _signature(taste: str | None) -> str:
-    """Hash de manifiesto + versión del tagger. Si cambia → re-tag."""
-    payload = f"{TAGGER_VERSION}|{taste or ''}"
+def _signature(taste: str | None, kids_manifesto: str | None) -> str:
+    """Hash de versión + ambos manifiestos. Si cambia algo → re-tag."""
+    payload = f"{TAGGER_VERSION}|{taste or ''}|{kids_manifesto or ''}"
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
@@ -113,13 +104,14 @@ def _parse_response(text: str) -> list[dict]:
         return json.loads(match.group())
 
 
-def _tag_batch(events: list[dict], taste: str | None) -> list[dict]:
+def _tag_batch(events: list[dict], taste: str | None,
+                kids_manifesto: str | None) -> list[dict]:
     """Etiqueta un batch. Devuelve lista alineada por índice; rellena con 0/0 si falta."""
     client = _get_client()
     response = client.messages.create(
         model=MODEL,
         max_tokens=4096,
-        messages=[{"role": "user", "content": _build_prompt(events, taste)}],
+        messages=[{"role": "user", "content": _build_prompt(events, taste, kids_manifesto)}],
     )
     raw = _parse_response(response.content[0].text)
     by_i = {r.get("i"): r for r in raw if isinstance(r, dict)}
@@ -135,17 +127,20 @@ def _tag_batch(events: list[dict], taste: str | None) -> list[dict]:
     return result
 
 
-def _load_taste() -> str | None:
-    return TASTE_PATH.read_text() if TASTE_PATH.exists() else None
+def _load(path: Path) -> str | None:
+    return path.read_text() if path.exists() else None
 
 
 def tag_events(con: sqlite3.Connection) -> None:
     """Re-etiqueta filas cuyo tags_hash no coincide con la firma actual."""
-    taste = _load_taste()
-    sig = _signature(taste)
+    taste = _load(TASTE_PATH)
+    kids_manifesto = _load(KIDS_PATH)
+    sig = _signature(taste, kids_manifesto)
 
     if not taste:
-        log.info("Tagger: sin manifiesto (data/jorge_taste.md) → selective siempre 0")
+        log.info("Tagger: sin data/jorge_taste.md → selective siempre 0")
+    if not kids_manifesto:
+        log.info("Tagger: sin data/kids_taste.md → kids_friendly siempre 0")
 
     rows = con.execute(
         "SELECT id, title, section, venue, source, description "
@@ -170,7 +165,7 @@ def tag_events(con: sqlite3.Connection) -> None:
             for r in batch
         ]
         try:
-            tags = _tag_batch(events, taste)
+            tags = _tag_batch(events, taste, kids_manifesto)
         except Exception:
             log.exception("  Tagger: batch %d-%d fallido", start, start + len(batch))
             continue
