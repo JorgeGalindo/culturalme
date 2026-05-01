@@ -67,6 +67,11 @@ header {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 56px 24px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 header h1 {
@@ -145,12 +150,9 @@ header .meta {
 .filter-btn[data-section="cine"]:not(.active):hover { background: var(--cine-bg); border-color: var(--cine-bg); color: var(--cine-text); }
 .filter-btn[data-section="teatro"]:not(.active):hover { background: var(--teatro-bg); border-color: var(--teatro-bg); color: var(--teatro-text); }
 
-/* Mode toggles (kids / selective) */
+/* Mode toggles (kids / selective) — viven en el header, junto al título */
 
 .mode-toggles {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 24px 12px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;

@@ -103,14 +103,13 @@ def generate():
 <body>
   <header>
     <h1><span class="brand-c">Cultural</span><span class="brand-m">Me</span> <span class="meta">Madrid</span></h1>
+    <div class="mode-toggles">
+      <a href="#" class="mode-pill" data-mode="kids" onclick="toggleMode(event, 'kids')">👶 Niños</a>
+      <a href="#" class="mode-pill" data-mode="selective" onclick="toggleMode(event, 'selective')">⭐ Selecto</a>
+    </div>
   </header>
 
   <nav class="filter-bar" id="filterBar"></nav>
-
-  <div class="mode-toggles">
-    <a href="#" class="mode-pill" data-mode="kids" onclick="toggleMode(event, 'kids')">👶 Niños</a>
-    <a href="#" class="mode-pill" data-mode="selective" onclick="toggleMode(event, 'selective')">⭐ Selecto</a>
-  </div>
 
   <div class="controls-bar">
     <div class="sort-links">
