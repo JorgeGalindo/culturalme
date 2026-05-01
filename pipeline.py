@@ -28,7 +28,7 @@ log = logging.getLogger("pipeline")
 
 
 def init_db():
-    """Crea la tabla events si no existe."""
+    """Crea la tabla events si no existe y migra columnas nuevas."""
     con = sqlite3.connect(DB_PATH)
     con.execute("""
         CREATE TABLE IF NOT EXISTS events (
@@ -44,9 +44,21 @@ def init_db():
             image_url TEXT,
             first_seen DATE NOT NULL,
             last_seen DATE NOT NULL,
-            artist_match TEXT
+            artist_match TEXT,
+            kids_friendly INTEGER,
+            selective INTEGER,
+            tags_hash TEXT
         )
     """)
+    # Migración suave: añadir columnas que falten en DBs existentes.
+    existing = {row[1] for row in con.execute("PRAGMA table_info(events)")}
+    for col, ddl in [
+        ("kids_friendly", "ALTER TABLE events ADD COLUMN kids_friendly INTEGER"),
+        ("selective", "ALTER TABLE events ADD COLUMN selective INTEGER"),
+        ("tags_hash", "ALTER TABLE events ADD COLUMN tags_hash TEXT"),
+    ]:
+        if col not in existing:
+            con.execute(ddl)
     con.commit()
     return con
 
@@ -169,6 +181,13 @@ def run():
                 upsert_events(con, events)
         except Exception:
             log.exception("  ✗ Error en %s — skipping", name)
+
+    log.info("Tagging eventos (kids_friendly + selective)...")
+    try:
+        from scrapers.tagger import tag_events
+        tag_events(con)
+    except Exception:
+        log.exception("  ✗ Error en tagger — eventos quedan sin etiquetar")
 
     total = con.execute("SELECT COUNT(*) FROM events").fetchone()[0]
     log.info("=== Done. %d eventos en DB ===", total)

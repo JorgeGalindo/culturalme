@@ -9,7 +9,7 @@ from scrapers.llm import extract_events
 log = logging.getLogger(__name__)
 
 FUENTES = [
-    ("Fundación Rafael del Pino", "https://frdelpino.es/"),
+    ("Fundación Rafael del Pino", "https://frdelpino.es/eventos/todos-los-eventos/"),
     ("Fundación Ramón Areces", "https://www.fundacionareces.es/fundacionareces/es/actividades/"),
     ("Fundación Juan March", "https://www.march.es/es/madrid/actividades"),
     ("Ateneo de Madrid", "https://www.ateneodemadrid.com/actividades"),

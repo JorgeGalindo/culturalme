@@ -34,17 +34,25 @@ def load_events() -> list[dict]:
     row = con.execute("SELECT MAX(last_seen) as latest FROM events").fetchone()
     latest_run = row["latest"] if row else today
 
+    # Vigencia:
+    # - cine: siempre (cartelera se reemplaza cada run)
+    # - sin fechas: se muestra (open-ended)
+    # - con date_end (típico exposición): vigente si date_start <= hoy <= date_end
+    #   → exposiciones que aún no han abierto NO aparecen
+    # - sólo date_start (típico concierto puntual): mostrar si es futuro
     rows = con.execute("""
         SELECT *, (first_seen = ?) as is_new
         FROM events
         WHERE (
             section = 'cine'
-            OR date_end >= ?
+            OR (date_start IS NULL AND date_end IS NULL)
+            OR (date_end IS NOT NULL
+                AND (date_start IS NULL OR date_start <= ?)
+                AND date_end >= ?)
             OR (date_end IS NULL AND date_start >= ?)
-            OR (date_end IS NULL AND date_start IS NULL)
         )
         ORDER BY first_seen DESC, COALESCE(date_start, '9999-12-31') ASC
-    """, (latest_run, today, today)).fetchall()
+    """, (latest_run, today, today, today)).fetchall()
 
     con.close()
 
@@ -62,6 +70,8 @@ def load_events() -> list[dict]:
             "artist_match": r["artist_match"],
             "first_seen": r["first_seen"],
             "is_new": bool(r["is_new"]),
+            "kids_friendly": bool(r["kids_friendly"]) if "kids_friendly" in r.keys() else False,
+            "selective": bool(r["selective"]) if "selective" in r.keys() else False,
         })
 
     return events, latest_run
@@ -97,6 +107,11 @@ def generate():
 
   <nav class="filter-bar" id="filterBar"></nav>
 
+  <div class="mode-toggles">
+    <a href="#" class="mode-pill" data-mode="kids" onclick="toggleMode(event, 'kids')">👶 Niños</a>
+    <a href="#" class="mode-pill" data-mode="selective" onclick="toggleMode(event, 'selective')">⭐ Selecto</a>
+  </div>
+
   <div class="controls-bar">
     <div class="sort-links">
       <a href="#" class="active" data-sort="nuevo" onclick="setSort('nuevo')">Más nuevo</a>
@@ -131,6 +146,17 @@ def generate():
 
   let currentSection = 'all';
   let currentSort = 'nuevo';
+  let modes = (() => {{
+    try {{ return JSON.parse(localStorage.getItem('culturalme_modes') || '{{}}'); }}
+    catch {{ return {{}}; }}
+  }})();
+
+  function toggleMode(ev, m) {{
+    ev.preventDefault();
+    modes[m] = !modes[m];
+    localStorage.setItem('culturalme_modes', JSON.stringify(modes));
+    render();
+  }}
 
   function seenKey(e) {{ return e.title + '||' + e.section; }}
   function getSeen() {{ try {{ return JSON.parse(localStorage.getItem('culturalme_seen') || '[]'); }} catch {{ return []; }} }}
@@ -171,6 +197,8 @@ def generate():
     let filtered = EVENTS.filter(e => {{
       if (currentSection !== 'all' && e.section !== currentSection) return false;
       if (venue && e.source !== venue && e.venue !== venue) return false;
+      if (modes.kids && !e.kids_friendly) return false;
+      if (modes.selective && !e.selective) return false;
       return true;
     }});
 
@@ -213,6 +241,11 @@ def generate():
     // Update sort links
     document.querySelectorAll('.sort-links a').forEach(a => {{
       a.classList.toggle('active', a.dataset.sort === currentSort);
+    }});
+
+    // Update mode pills
+    document.querySelectorAll('.mode-pill').forEach(a => {{
+      a.classList.toggle('active', !!modes[a.dataset.mode]);
     }});
 
     // Update venue dropdown

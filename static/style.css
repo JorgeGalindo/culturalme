@@ -145,6 +145,43 @@ header .meta {
 .filter-btn[data-section="cine"]:not(.active):hover { background: var(--cine-bg); border-color: var(--cine-bg); color: var(--cine-text); }
 .filter-btn[data-section="teatro"]:not(.active):hover { background: var(--teatro-bg); border-color: var(--teatro-bg); color: var(--teatro-text); }
 
+/* Mode toggles (kids / selective) */
+
+.mode-toggles {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mode-pill {
+  font-family: "Fraunces", serif;
+  font-size: 0.72rem;
+  font-weight: 400;
+  padding: 4px 12px;
+  border-radius: 24px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+.mode-pill:hover {
+  color: var(--text);
+  border-color: var(--text-secondary);
+}
+
+.mode-pill.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
 /* Controls bar */
 
 .controls-bar {

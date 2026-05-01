@@ -12,7 +12,7 @@ FUENTES = [
     # CDN / María Guerrero: dominio cdn.mcu.es no resuelve.
     # CNTC (Teatro de la Comedia): dominio caído también.
     # TODO: buscar nuevas URLs cuando resuelvan sus dominios.
-    ("Teatros del Canal", "https://www.teatroscanal.com/"),
+    ("Teatros del Canal", "https://www.teatroscanal.com/cartelera-madrid/"),
     ("Teatro Español", "https://www.teatroespanol.es/"),
     ("Teatro de la Abadía", "https://www.teatroabadia.com/"),
     ("Naves del Español", "https://www.mataderomadrid.org/programacion"),
@@ -20,6 +20,8 @@ FUENTES = [
     ("Nave 73", "https://nave73.es/programacion/"),
     ("Sala Cuarta Pared", "https://www.cuartapared.es/"),
     ("Sala Triángulo", "https://www.salatriangulo.com/"),
+    ("Teatro Bellas Artes", "https://www.teatrobellasartes.es/"),
+    ("Teatro Calderón", "https://teatrocalderonmadrid.com/es/cartelera"),
 ]
 
 
