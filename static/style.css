@@ -56,19 +56,21 @@ h1 {
 #modos .chip { font-size: 0.82rem; letter-spacing: 0.16em; text-transform: uppercase; padding: 0.28rem 0.8rem; }
 #secciones .chip { font-size: 0.85rem; padding: 0.24rem 0.75rem; }
 
-/* ---------- listado ---------- */
-main { margin-top: 2.4rem; }
-
-.grupo { margin-bottom: 2.6rem; }
-.grupo h3 {
-  font-family: 'Poiret', sans-serif; font-weight: 400;
-  font-size: 0.78rem; letter-spacing: 0.26em; text-transform: uppercase;
-  color: var(--apagado); margin: 0 0 0.2rem;
+.orden {
+  display: flex; gap: 1.4rem; margin-top: 1.7rem;
   padding-bottom: 0.7rem; border-bottom: 1px solid var(--linea);
 }
+.orden button {
+  font-family: 'Poiret', sans-serif; font-size: 0.76rem;
+  letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--apagado); cursor: pointer; padding: 0;
+  transition: color .25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.orden button.on { color: var(--claro); }
 
-.grupo.aparte { margin-top: 3.2rem; margin-bottom: 1.6rem; }
-.grupo.aparte h3 { color: var(--medio); }
+/* ---------- listado ---------- */
+main { margin-top: 0; }
 
 .ficha {
   padding: 1.5rem 0 1.35rem;

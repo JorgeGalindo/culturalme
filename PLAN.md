@@ -73,3 +73,22 @@ Punto de partida medido (pasada del 14-ago): 241 eventos publicados, **1 empezab
 - Conciertos por Songkick o Ticketmaster Discovery (JSON estructurado, cero LLM). Descartado hoy por decisión
   tuya; la puerta queda abierta.
 - Imágenes en las tarjetas, notificaciones, filtro por barrio, precios y entradas.
+
+---
+
+## Después de ejecutarlo (20-ago-2026)
+
+La primera pasada real con el modelo confirmó los arreglos de datos (0 duplicados, 0 fechas incoherentes,
+0 eventos fechados en 2024, 6m10s frente a 15m56s) y tumbó la decisión de producto principal:
+
+**"Esta semana" no funciona.** En agosto Madrid no tiene un solo evento con día propio — el primero es el
+1 de septiembre. La ventana de 7 días dejaba la portada en tres obras y la cartelera de cine, que se lee
+exactamente igual que la app rota de la que veníamos. El problema no era el dato, era el recorte: la
+temporada de Madrid arranca en septiembre y no cabe en siete días.
+
+Sustituido por **cuatro pestañas de tipo de actividad** (exposiciones, cine, teatro, charlas), sin ventana
+temporal, con **orden por fecha de fin** y un conmutador a "más nuevo". Vuelven así los dos controles que
+la v2 había quitado por redundantes, que dejan de serlo en cuanto desaparece la agrupación por día.
+
+Lo demás del plan se mantiene: la purga por `last_seen`, el `event_id` sin fecha, la validación de fechas
+en Python, el rescate TLS, las 39 fuentes, el escapado y el diseño de granvia.

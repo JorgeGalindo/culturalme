@@ -1,20 +1,20 @@
 # CulturalMe — Madrid
 
-La agenda cultural de **esta semana** en Madrid. Se actualiza sola cada viernes por la mañana y se sirve
-como sitio estático en GitHub Pages. Sin servidor.
+Agenda cultural de Madrid. Se actualiza sola cada viernes por la mañana y se sirve como sitio estático
+en GitHub Pages. Sin servidor.
 
 **https://jorgegalindo.github.io/culturalme/**
 
 ## Qué es
 
-Dos planos, porque son dos preguntas distintas:
+Cuatro pestañas por tipo de actividad: **exposiciones** (museos y galerías), **cine**, **teatro** y
+**charlas**. Se muestra todo lo vigente, sin ventana temporal.
 
-- **Esta semana** — lo que tiene día: charlas, teatro y la cartelera de cine. Agrupado por día, con un
-  bloque "en cartel" para lo que ya está abierto y sigue toda la semana.
-- **Exposiciones** — museos y galerías, que duran meses. Ordenadas por **fecha de cierre ascendente**:
-  arriba lo que se acaba antes, que es lo accionable.
+El orden por defecto es **fecha de fin ascendente**: arriba lo que cierra antes, que es lo accionable —
+te dice qué se te está escapando. A un toque, **más nuevo**: lo recién detectado por el scraper, para
+ver qué ha aparecido desde la última vez.
 
-Encima, dos modos que filtran cualquiera de los planos: **⭐ Selecto** (encaja con `data/jorge_taste.md`)
+Encima, dos modos que filtran cualquier pestaña: **⭐ Selecto** (encaja con `data/jorge_taste.md`)
 y **👶 Niños** (encaja con `data/kids_taste.md`). Ambos los etiqueta el LLM tras cada pasada.
 
 ## Cómo funciona
@@ -35,6 +35,11 @@ viernes 7:00 CET
 **Nada se publica si no se ha visto en la última pasada.** Que una fuente deje de listar un evento es la
 señal de que el evento se acabó. Sin esa regla el sitio acumulaba fantasmas: llegó a publicar 106 eventos
 (el 44% de la portada) que llevaban meses sin aparecer en ninguna web.
+
+**No hay ventana temporal.** Se probó a recortar a "esta semana" y no funciona: en agosto Madrid no tiene
+un solo evento con día propio (el primero es el 1 de septiembre), así que el recorte escondía el catálogo
+entero y la app volvía a parecer rota. La temporada arranca en septiembre y el ritmo de la ciudad no cabe
+en siete días.
 
 ## Fuentes (39)
 
@@ -70,6 +75,9 @@ Cada fuente muerta costaba una llamada al modelo y hasta 15s de reintentos.
   (`culturaydeporte.gob.es`, `fundacionico.es`, `cinesembajadores.es`) sirven cadenas incompletas y
   llevaban meses caídas por eso. Sólo leemos HTML público y no mandamos credenciales.
 - **Todo lo que entra en el DOM pasa por `esc()`.** El contenido lo escribe un LLM sobre HTML ajeno.
+- **El orden por defecto es la fecha de fin, no la de inicio.** Una exposición que abrió en marzo y cierra
+  el sábado es urgente; una que abre en noviembre no. Ordenar por inicio pone arriba justo lo que no corre
+  prisa.
 - **No hay conciertos.** Los hubo: 18 eventos en cuatro meses con 4.000 artistas en lista, y 4 minutos de
   cada pasada para encontrar uno. Bandsintown devuelve 403. Si vuelven, será por API estructurada
   (Songkick, Ticketmaster Discovery), no por LLM.
