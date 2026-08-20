@@ -67,6 +67,9 @@ main { margin-top: 2.4rem; }
   padding-bottom: 0.7rem; border-bottom: 1px solid var(--linea);
 }
 
+.grupo.aparte { margin-top: 3.2rem; margin-bottom: 1.6rem; }
+.grupo.aparte h3 { color: var(--medio); }
+
 .ficha {
   padding: 1.5rem 0 1.35rem;
   border-bottom: 1px solid var(--linea);

@@ -20,6 +20,7 @@ DOCS_DIR = Path(__file__).parent / "docs"
 STATIC_DIR = Path(__file__).parent / "static"
 
 VENTANA_DIAS = 7
+PROXIMOS_MAX = 12  # cuántos eventos futuros enseñar cuando la semana está vacía
 
 AGENDA = ["charla", "teatro", "cine"]
 EXPOS = ["museo", "galeria"]
@@ -75,11 +76,19 @@ def load_events():
             elif ini and ini < hoy and (end or ini) >= hoy:
                 e["grupo"] = "cartel"    # ya abierto y sigue toda la semana
                 agenda.append(e)
+            elif ini and ini > fin:
+                e["grupo"] = "proximo"   # sólo se pinta si la semana sale vacía
+                agenda.append(e)
         elif e["section"] in EXPOS:
             abierta = (not ini or ini <= hoy) and (not end or end >= hoy)
             if abierta:
                 expos.append(e)
 
+    agenda.sort(key=lambda e: (e["date_start"] or "9999", e["title"]))
+    # En agosto Madrid cierra: sin este recorte "próximamente" arrastraría
+    # media temporada 2026/27 hasta junio.
+    proximos = [e for e in agenda if e["grupo"] == "proximo"][:PROXIMOS_MAX]
+    agenda = [e for e in agenda if e["grupo"] != "proximo"] + proximos
     agenda.sort(key=lambda e: (e["date_start"] or "9999", e["title"]))
     expos.sort(key=lambda e: (e["date_end"] or "9999", e["title"]))
     return agenda, expos, latest
@@ -237,11 +246,25 @@ function pintar() {{
   if (!ev.length) {{
     html = '<p class="vacio">Nada con estos filtros.</p>';
   }} else if (plano === 'semana') {{
+    const conDia = ev.filter(e => e.grupo === 'dia');
     const porDia = {{}};
-    ev.filter(e => e.grupo === 'dia').forEach(e => (porDia[e.date_start] ??= []).push(e));
+    conDia.forEach(e => (porDia[e.date_start] ??= []).push(e));
     Object.keys(porDia).sort().forEach(d => {{ html += grupo(diaLargo(d), porDia[d]); }});
     html += grupo('en cartel', ev.filter(e => e.grupo === 'cartel'));
     html += grupo('cine', ev.filter(e => e.grupo === 'cine'));
+    // Sólo cuando no hay nada con día propio: en agosto la ciudad cierra y una
+    // agenda vacía se lee como una app rota.
+    if (!conDia.length) {{
+      const prox = ev.filter(e => e.grupo === 'proximo');
+      if (prox.length) {{
+        const porDiaProx = {{}};
+        prox.forEach(e => (porDiaProx[e.date_start] ??= []).push(e));
+        html += '<section class="grupo aparte"><h3>próximamente</h3></section>';
+        Object.keys(porDiaProx).sort().forEach(d => {{
+          html += grupo(diaLargo(d), porDiaProx[d]);
+        }});
+      }}
+    }}
   }} else {{
     html = grupo('abiertas ahora', ev);
   }}
