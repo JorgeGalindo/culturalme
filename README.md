@@ -1,94 +1,103 @@
 # CulturalMe — Madrid
 
-Agenda cultural personalizada para Madrid. Se actualiza cada viernes via GitHub Actions y se sirve como sitio estatico en GitHub Pages. Sin servidor.
+La agenda cultural de **esta semana** en Madrid. Se actualiza sola cada viernes por la mañana y se sirve
+como sitio estático en GitHub Pages. Sin servidor.
 
 **https://jorgegalindo.github.io/culturalme/**
 
-## Que es
+## Qué es
 
-Un unico lugar para ver que hay en Madrid esta semana en museos, conciertos, galerias, charlas, cine y teatro. Solo muestra conciertos de artistas que me gustan (lista de ~4000 artistas de mi proyecto musicalme).
+Dos planos, porque son dos preguntas distintas:
 
-## Como funciona
+- **Esta semana** — lo que tiene día: charlas, teatro y la cartelera de cine. Agrupado por día, con un
+  bloque "en cartel" para lo que ya está abierto y sigue toda la semana.
+- **Exposiciones** — museos y galerías, que duran meses. Ordenadas por **fecha de cierre ascendente**:
+  arriba lo que se acaba antes, que es lo accionable.
+
+Encima, dos modos que filtran cualquiera de los planos: **⭐ Selecto** (encaja con `data/jorge_taste.md`)
+y **👶 Niños** (encaja con `data/kids_taste.md`). Ambos los etiqueta el LLM tras cada pasada.
+
+## Cómo funciona
 
 ```
-viernes 7AM CET
+viernes 7:00 CET
   GitHub Actions ejecuta pipeline.py
-    → scrapers descargan HTML de ~50 fuentes
+    → scrapers descargan HTML de 39 fuentes
     → Claude Haiku 4.5 extrae eventos del texto
-    → SQLite se actualiza (upsert, dedup)
+    → SQLite se actualiza (upsert por título+sede, purga lo que lleva 60 días sin verse)
+    → el tagger marca kids_friendly y selective
   GitHub Actions ejecuta generate.py
-    → lee SQLite, genera docs/index.html estatico
+    → lee SQLite, genera docs/index.html estático
     → commit + push
-  GitHub Pages se actualiza automaticamente
+  GitHub Pages se actualiza automáticamente
 ```
 
-No hay servidor. No hay Flask en produccion. Todo es un HTML estatico con JS vanilla para los filtros y el estado "Visto" (localStorage).
+**Nada se publica si no se ha visto en la última pasada.** Que una fuente deje de listar un evento es la
+señal de que el evento se acabó. Sin esa regla el sitio acumulaba fantasmas: llegó a publicar 106 eventos
+(el 44% de la portada) que llevaban meses sin aparecer en ninguna web.
 
-## Fuentes
+## Fuentes (39)
 
-### Museos y exposiciones (18)
-Prado, Reina Sofia, Thyssen, Matadero, F. Telefonica, La Casa Encendida, F. Mapfre, Canal de Isabel II, Conde Duque, CBA, F. ICO, Real Academia de San Fernando, CentroCentro, Alcala 31, F. Masaveu, Artes Decorativas, Cerralbo, F. Juan March, Lazaro Galdiano
+**Museos y espacios (16)** — CentroCentro, Reina Sofía, Real Academia de San Fernando, Matadero,
+Thyssen, F. Telefónica, CBA, Canal de Isabel II, Lázaro Galdiano, F. Mapfre, Conde Duque, F. Masaveu,
+Alcalá 31, Artes Decorativas, Cerralbo, F. ICO.
 
-### Conciertos (12 salas + Bandsintown + DICE)
-**Bandsintown** y **DICE** (API REST) como agregadores principales (filtran contra lista de 4000 artistas).
-Salas: El Sol, Moby Dick, La Riviera, Sala But, Clamores, Siroco, Independance, Shoko, Cafe Berlin, Galileo Galilei, Teatro Barcelo.
-Deduplicacion por artista + fecha.
+**Galerías (9)** — Travesía Cuatro, NoguerasBlanchard, Max Estrella, Marlborough, José de la Mano,
+F2, Heinrich Ehrhardt, Elba Benítez, Sabrina Amrani.
 
-### Galerias (20 + ferias)
-Elvira Gonzalez, Helga de Alvear, Juana de Aizpuru, Travesia Cuatro, Moises Perez de Albeniz, Casa Sin Fin, NoguerasBlanchard, Parra & Romero, F2, Heinrich Ehrhardt, Elba Benitez, Cayon, Sabrina Amrani, Marlborough, Max Estrella, Jose de la Mano, Albarran Bourdais, Leandro Navarro, Garcia Galeria, Fernandez-Braso.
-Ferias: ARCO, Art Madrid, JustMAD, Estampa, Gallery Weekend.
+**Charlas (4)** — F. Ramón Areces, F. Rafael del Pino, CBA, F. Telefónica.
 
-### Charlas (8)
-F. Rafael del Pino, F. Ramon Areces, F. Juan March, Ateneo, CBA, Casa Arabe, IE Foundation, F. Telefonica.
+**Teatro (8)** — Teatros del Canal, Calderón, Nave 73, Teatro del Barrio, Bellas Artes, La Abadía,
+Teatro Español, Cuarta Pared.
 
-### Cine
-Cines Renoir (todas las sedes Madrid) y Cines Embajadores. Director y etiquetas (ESTRENO, OSCAR...).
+**Cine (2)** — Cines Renoir y Cines Embajadores.
 
-### Teatro (8)
-Teatros del Canal, Teatro Espanol, Teatro de la Abadia, Naves del Espanol (Matadero), Teatro del Barrio, Nave 73, Sala Cuarta Pared, Sala Triangulo.
+El criterio para estar en la lista es haber producido algo en las últimas cuatro pasadas. En agosto de 2026
+se pasó de 76 fuentes a 39: 26 no habían producido **nunca** un solo evento (el Prado da 403, cinco dominios
+de galería ya no resuelven DNS, las cinco ferias nunca dieron nada) y las demás llevaban meses en cero.
+Cada fuente muerta costaba una llamada al modelo y hasta 15s de reintentos.
 
-## Stack
+## Decisiones que no son obvias
 
-- **Python 3.13** — scrapers + generador estatico
-- **Claude Haiku 4.5** via API — extraccion de eventos del HTML (prompts especificos por seccion)
-- **SQLite** — almacenamiento
-- **GitHub Actions** — cron semanal
-- **GitHub Pages** — hosting (gratis)
-- **Fraunces** — tipografia
-- Paleta pastel rainbow
-- **localStorage** — estado "Visto" persistente por evento
+- **`event_id` = `source|title|venue`, sin fecha.** La fecha es el dato que el LLM extrae peor; con ella en
+  la clave, cada lectura errónea creaba una fila nueva (el mismo montaje llegó a estar cuatro veces con
+  cuatro años distintos). Ahora las fechas se actualizan encima de la fila que ya existe.
+- **Las fechas se validan en Python, no se le confían al modelo.** La fecha de hoy va en el prompt, y luego
+  se exige `YYYY-MM-DD` dentro de una ventana de `[hoy−2 años, hoy+18 meses]`. Un `date_end` anterior al
+  `date_start` se interpreta como cruce de año ("del 9 de julio al 10 de enero") y salta al año siguiente.
+  Una fecha inválida se descarta sola; el evento sobrevive sin ella.
+- **Ante error de certificado se reintenta sin verificar.** Varias sedes públicas
+  (`culturaydeporte.gob.es`, `fundacionico.es`, `cinesembajadores.es`) sirven cadenas incompletas y
+  llevaban meses caídas por eso. Sólo leemos HTML público y no mandamos credenciales.
+- **Todo lo que entra en el DOM pasa por `esc()`.** El contenido lo escribe un LLM sobre HTML ajeno.
+- **No hay conciertos.** Los hubo: 18 eventos en cuatro meses con 4.000 artistas en lista, y 4 minutos de
+  cada pasada para encontrar uno. Bandsintown devuelve 403. Si vuelven, será por API estructurada
+  (Songkick, Ticketmaster Discovery), no por LLM.
 
 ## Estructura
 
 ```
 culturalme/
 ├── scrapers/
-│   ├── llm.py          # Modulo compartido: fetch, clean HTML, call Haiku
-│   ├── museos.py       # 17 fuentes, modo LLM
-│   ├── conciertos.py   # Bandsintown + 11 salas, filtro artistas, dedup
-│   ├── galerias.py     # 20 galerias + ferias, modo LLM
-│   ├── charlas.py      # 8 fuentes, modo LLM
-│   ├── cine.py         # Renoir, prompt especifico para cartelera
-│   └── teatro.py       # 8 teatros, modo LLM
-├── pipeline.py         # Orquesta scrapers, upsert en SQLite
-├── generate.py         # Lee SQLite, genera docs/index.html estatico
+│   ├── llm.py          # fetch (con fallback TLS), limpieza, prompts, saneado de fechas
+│   ├── museos.py  galerias.py  charlas.py  cine.py  teatro.py
+│   └── tagger.py       # kids_friendly + selective contra los manifiestos
+├── pipeline.py         # orquesta scrapers, upsert y purga en SQLite
+├── generate.py         # lee SQLite, genera docs/index.html
 ├── data/
-│   ├── culturalme.db   # SQLite con todos los eventos
-│   └── artists.json    # 4000 artistas de musicalme (filtro conciertos)
-├── docs/
-│   ├── index.html      # Sitio estatico generado (GitHub Pages)
-│   └── style.css
+│   ├── culturalme.db   # SQLite
+│   ├── jorge_taste.md  # manifiesto del modo Selecto
+│   └── kids_taste.md   # manifiesto del modo Niños
 ├── static/
-│   └── style.css       # CSS fuente (se copia a docs/)
-├── .github/workflows/
-│   └── update.yml      # Cron viernes 7AM CET
-├── requirements.txt
-└── runtime.txt
+│   ├── style.css       # fuente (se copia a docs/)
+│   └── fonts/          # Poiret One + EB Garamond, autoalojadas
+├── docs/               # lo que publica GitHub Pages
+└── .github/workflows/update.yml
 ```
 
 ## Coste
 
-~$2-4/mes en API de Anthropic (Haiku 4.5, ~50 llamadas/semana). Hosting gratis.
+~$1-2 al mes en API de Anthropic (Haiku 4.5, 39 llamadas por semana más el tagger). Hosting gratis.
 
 ## Setup local
 
@@ -96,30 +105,20 @@ culturalme/
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
-export DICE_API_KEY=...        # opcional, para fuente DICE
-python pipeline.py    # scrape todo
+python pipeline.py    # scrape + tag
 python generate.py    # genera docs/index.html
-open docs/index.html  # ver resultado
+open docs/index.html
 ```
 
-## Setup CI (GitHub Actions)
+## Setup CI
 
-El cron necesita dos cosas en el repo:
-
-1. **Secret `ANTHROPIC_API_KEY`** — Settings → Secrets and variables → Actions → New repository secret.
-2. **Secret `DICE_API_KEY`** (opcional) — si no está, DICE se salta sin error.
-3. **Permisos de escritura** — `permissions: contents: write` ya está en el workflow; no hace falta tocar nada en GitHub si el repo permite que las Actions escriban (Settings → Actions → General → Workflow permissions).
-
-## Funcionalidades
-
-- Filtros por seccion (museo, concierto, galeria, charla, cine, teatro)
-- Orden por fecha o por mas reciente
-- Filtro por sede
-- Boton "Visto" por evento: marca eventos ya vistos, se guardan en localStorage, se muestran atenuados y al final de cualquier listado
-- Badge "nuevo" para eventos recien detectados
+El cron necesita el secret `ANTHROPIC_API_KEY` (Settings → Secrets and variables → Actions) y permiso de
+escritura para las Actions, que ya está declarado en el workflow.
 
 ## Pendiente
 
-- CaixaForum: Cloudflare bloquea requests, necesita Playwright o alternativa
-- CDN y CNTC cuando arreglen sus dominios
-- Mas galerias (muchas son muy minimalistas y dan 0)
+- El **Prado** da 403 en todas sus rutas y el **Thyssen** y once webs más son SPAs que sirven JS: harían
+  falta Playwright y un runner distinto. Es su propio trabajo.
+- Seis de las 39 fuentes devuelven menos de 600 caracteres de texto y sólo producen de vez en cuando
+  (Teatro Español, José de la Mano, Cuarta Pared, Sabrina Amrani, Masaveu, F. Telefónica/agenda).
+  Están a prueba: si siguen en cero, fuera.

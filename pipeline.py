@@ -4,14 +4,15 @@ Ejecuta todos los scrapers, deduplica, y escribe en SQLite.
 """
 
 import hashlib
-import json
 import logging
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "data" / "culturalme.db"
-ARTISTS_PATH = Path(__file__).parent / "data" / "artists.json"
+
+# Filas que llevan este tiempo sin verse en su fuente se borran.
+RETENTION_DAYS = 60
 
 # Eventos que nunca deben entrar (instalaciones permanentes, etc.)
 # Cada tupla: (substring en título, substring en source). Case-insensitive.
@@ -41,16 +42,13 @@ def init_db():
             description TEXT,
             url TEXT,
             source TEXT,
-            image_url TEXT,
             first_seen DATE NOT NULL,
             last_seen DATE NOT NULL,
-            artist_match TEXT,
             kids_friendly INTEGER,
             selective INTEGER,
             tags_hash TEXT
         )
     """)
-    # Migración suave: añadir columnas que falten en DBs existentes.
     existing = {row[1] for row in con.execute("PRAGMA table_info(events)")}
     for col, ddl in [
         ("kids_friendly", "ALTER TABLE events ADD COLUMN kids_friendly INTEGER"),
@@ -59,128 +57,115 @@ def init_db():
     ]:
         if col not in existing:
             con.execute(ddl)
+    # generate.py filtra por last_seen y ordena por fecha en cada pasada.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_last_seen ON events(last_seen)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_section_dates ON events(section, date_start, date_end)")
     con.commit()
     return con
 
 
-def event_id(source: str, title: str, venue: str | None, date_start: str | None) -> str:
-    """Genera un ID determinista para un evento."""
-    raw = f"{source}|{title}|{venue or ''}|{date_start or ''}"
+def event_id(source: str, title: str, venue: str | None) -> str:
+    """ID determinista de un evento.
+
+    Sin fecha a propósito: la fecha es el dato que el LLM extrae peor, y
+    meterla en la clave convertía cada relectura errónea en una fila nueva
+    (el mismo montaje llegó a estar cuatro veces con cuatro años distintos).
+    Título + sede identifican el evento; las fechas se actualizan encima.
+    """
+    raw = f"{source}|{title.strip().lower()}|{(venue or '').strip().lower()}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def _is_excluded(e: dict) -> bool:
     """Comprueba si un evento está en la lista de exclusión global (substring match)."""
-    t = e.get("title", "").lower()
-    s = e.get("source", "").lower()
-    for title_sub, source_sub in GLOBAL_EXCLUDE:
-        if title_sub in t and source_sub in s:
-            return True
-    return False
+    t = (e.get("title") or "").lower()
+    s = (e.get("source") or "").lower()
+    return any(ts in t and ss in s for ts, ss in GLOBAL_EXCLUDE)
 
 
-def upsert_events(con: sqlite3.Connection, events: list[dict]):
-    """Inserta eventos nuevos o actualiza last_seen de los existentes."""
+def store_events(con: sqlite3.Connection, section: str, events: list[dict],
+                  replace: bool = False):
+    """Inserta o actualiza los eventos de una sección.
+
+    replace=True vacía la sección primero (cine: la cartelera no acumula).
+    En un evento ya conocido se refrescan fechas, descripción y URL: la
+    fuente es la autoridad, y un date_end que se alarga es información nueva.
+    """
     today = date.today().isoformat()
     events = [e for e in events if not _is_excluded(e)]
+
+    if replace:
+        con.execute("DELETE FROM events WHERE section = ?", (section,))
+
+    # Una misma página suele listar el mismo evento varias veces, y no siempre
+    # con los mismos datos: una lectura trae las fechas y otra no. Se funden
+    # quedándose con el primer valor no vacío de cada campo.
+    CAMPOS = ("venue", "date_start", "date_end", "description", "url")
+    fundidos: dict[str, dict] = {}
     for e in events:
-        eid = event_id(e["source"], e["title"], e.get("venue"), e.get("date_start"))
-        existing = con.execute("SELECT id FROM events WHERE id = ?", (eid,)).fetchone()
-        if existing:
-            con.execute("UPDATE events SET last_seen = ? WHERE id = ?", (today, eid))
+        eid = event_id(e["source"], e["title"], e.get("venue"))
+        if eid in fundidos:
+            base = fundidos[eid]
+            for c in CAMPOS:
+                if not base.get(c) and e.get(c):
+                    base[c] = e[c]
+        else:
+            fundidos[eid] = dict(e)
+
+    for eid, e in fundidos.items():
+        row = (e["section"], e["title"], e.get("venue"), e.get("date_start"),
+               e.get("date_end"), e.get("description"), e.get("url"), e["source"])
+        if con.execute("SELECT 1 FROM events WHERE id = ?", (eid,)).fetchone():
+            con.execute(
+                """UPDATE events SET section=?, title=?, venue=?, date_start=?,
+                   date_end=?, description=?, url=?, source=?, last_seen=?
+                   WHERE id=?""",
+                (*row, today, eid),
+            )
         else:
             con.execute(
                 """INSERT INTO events
-                   (id, section, title, venue, date_start, date_end, description,
-                    url, source, image_url, first_seen, last_seen, artist_match)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    eid,
-                    e["section"],
-                    e["title"],
-                    e.get("venue"),
-                    e.get("date_start"),
-                    e.get("date_end"),
-                    e.get("description"),
-                    e.get("url"),
-                    e["source"],
-                    e.get("image_url"),
-                    today,
-                    today,
-                    e.get("artist_match"),
-                ),
+                   (section, title, venue, date_start, date_end, description,
+                    url, source, first_seen, last_seen, id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (*row, today, today, eid),
             )
     con.commit()
 
 
-def replace_section(con: sqlite3.Connection, section: str, events: list[dict]):
-    """Reemplaza todos los eventos de una sección (para cine, que no acumula)."""
-    today = date.today().isoformat()
-    events = [e for e in events if not _is_excluded(e)]
-    con.execute("DELETE FROM events WHERE section = ?", (section,))
-    for e in events:
-        eid = event_id(e["source"], e["title"], e.get("venue"), e.get("date_start"))
-        con.execute(
-            """INSERT INTO events
-               (id, section, title, venue, date_start, date_end, description,
-                url, source, image_url, first_seen, last_seen, artist_match)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                eid,
-                e["section"],
-                e["title"],
-                e.get("venue"),
-                e.get("date_start"),
-                e.get("date_end"),
-                e.get("description"),
-                e.get("url"),
-                e["source"],
-                e.get("image_url"),
-                today,
-                today,
-                e.get("artist_match"),
-            ),
-        )
+def purge_stale(con: sqlite3.Connection):
+    """Borra lo que lleva RETENTION_DAYS sin aparecer en su fuente."""
+    cutoff = (date.today() - timedelta(days=RETENTION_DAYS)).isoformat()
+    n = con.execute("DELETE FROM events WHERE last_seen < ?", (cutoff,)).rowcount
     con.commit()
-
-
-def load_artists() -> set[str]:
-    """Carga la lista de artistas normalizados para filtro de conciertos."""
-    if not ARTISTS_PATH.exists():
-        log.warning("No se encontró artists.json — conciertos no se filtrarán")
-        return set()
-    with open(ARTISTS_PATH) as f:
-        artists = json.load(f)
-    return {a.lower().strip() for a in artists}
+    if n:
+        log.info("Purga: %d eventos sin verse desde antes de %s", n, cutoff)
 
 
 def run():
     log.info("=== CulturalMe pipeline — %s ===", date.today().isoformat())
     con = init_db()
-    artists = load_artists()
 
-    from scrapers import museos, conciertos, galerias, charlas, cine, teatro
+    from scrapers import museos, galerias, charlas, cine, teatro
 
     scrapers = [
-        ("museos", museos.scrape, False),
-        ("conciertos", lambda: conciertos.scrape(artists), False),
-        ("galerias", galerias.scrape, False),
-        ("charlas", charlas.scrape, False),
-        ("cine", cine.scrape, True),  # True = replace, no accumulate
+        ("museo", museos.scrape, False),
+        ("galeria", galerias.scrape, False),
+        ("charla", charlas.scrape, False),
+        ("cine", cine.scrape, True),  # True = replace, la cartelera no acumula
         ("teatro", teatro.scrape, False),
     ]
 
-    for name, scrape_fn, replace in scrapers:
+    for section, scrape_fn, replace in scrapers:
         try:
-            log.info("Scraping %s...", name)
+            log.info("Scraping %s...", section)
             events = scrape_fn()
             log.info("  → %d eventos", len(events))
-            if replace:
-                replace_section(con, name, events)
-            else:
-                upsert_events(con, events)
+            store_events(con, section, events, replace=replace)
         except Exception:
-            log.exception("  ✗ Error en %s — skipping", name)
+            log.exception("  ✗ Error en %s — skipping", section)
+
+    purge_stale(con)
 
     log.info("Tagging eventos (kids_friendly + selective)...")
     try:
@@ -190,7 +175,9 @@ def run():
         log.exception("  ✗ Error en tagger — eventos quedan sin etiquetar")
 
     total = con.execute("SELECT COUNT(*) FROM events").fetchone()[0]
-    log.info("=== Done. %d eventos en DB ===", total)
+    fresh = con.execute("SELECT COUNT(*) FROM events WHERE last_seen = ?",
+                        (date.today().isoformat(),)).fetchone()[0]
+    log.info("=== Done. %d eventos en DB, %d vistos hoy ===", total, fresh)
     con.close()
 
 

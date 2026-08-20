@@ -1,465 +1,124 @@
-/* CulturalMe — Madrid */
+@font-face { font-family: 'Poiret'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('fonts/poiretone.woff2') format('woff2'); }
+@font-face { font-family: 'Garamond P'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('fonts/ebgaramond.woff2') format('woff2'); }
+@font-face { font-family: 'Garamond P'; font-style: italic; font-weight: 400; font-display: swap;
+  src: url('fonts/ebgaramond-italic.woff2') format('woff2'); }
 
 :root {
-  --bg: #FAF8F4;
-  --surface: #FFFFFF;
-  --text: #3A3632;
-  --text-desc: #5E5850;
-  --text-secondary: #9A948C;
-  --text-venue: #6E6860;
-  --border: #EDE9E3;
-  --radius: 14px;
-  --max-width: 720px;
-
-  /* Pastel Rainbow */
-  --museo-bg: #FAEDCB;
-  --museo-text: #6B5A2E;
-  --concierto-bg: #C9E4DE;
-  --concierto-text: #3A6B5E;
-  --galeria-bg: #C6DEF1;
-  --galeria-text: #3A5E78;
-  --charla-bg: #DBCDF0;
-  --charla-text: #5A4478;
-  --cine-bg: #F2C6D3;
-  --cine-text: #784458;
-  --teatro-bg: #F7D9C4;
-  --teatro-text: #7A4E38;
-
-  /* Brand */
-  --brand-dark: #6B4F3A;
-  --brand-light: #A8896B;
+  --negro: #000;
+  --papel: #d6d0c4;
+  --claro: #f1ede4;
+  --medio: #a9a396;
+  --gris: #7c776e;
+  --apagado: #55524c;
+  --linea: #2e2c29;
+  --borde-on: #6b655a;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--negro); }
 body {
-  font-family: "Fraunces", serif;
-  font-weight: 300;
-  font-optical-sizing: auto;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.65;
+  font-family: 'Garamond P', Garamond, Georgia, serif;
+  color: var(--papel);
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  padding: 0 1.4rem calc(3rem + env(safe-area-inset-bottom));
+  max-width: 42rem; margin: 0 auto;
+}
+button { font-family: inherit; color: inherit; background: none; border: 0; }
+a { color: inherit; }
+
+/* ---------- cabecera ---------- */
+#cabecera { padding: 3.5vh 0 0; }
+h1 {
+  font-family: 'Poiret', 'Century Gothic', sans-serif; font-weight: 400;
+  font-size: clamp(2rem, 10vw, 3.1rem); line-height: 1;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--claro); margin: 0;
+}
+.lema {
+  font-family: 'Poiret', sans-serif; font-size: 0.8rem; color: var(--gris);
+  margin: 0.5rem 0 0; letter-spacing: 0.3em; text-transform: uppercase;
 }
 
-/* Pictograms */
+.chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 1.2rem; }
+#modos, #secciones { margin-top: 0.5rem; }
+#secciones:empty { display: none; }
+.chip {
+  font-family: 'Poiret', sans-serif; font-size: 0.95rem; letter-spacing: 0.07em;
+  color: var(--gris); border: 1px solid var(--linea); border-radius: 999px;
+  padding: 0.32rem 0.85rem; cursor: pointer;
+  transition: color .25s ease, border-color .25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.chip.on { color: var(--claro); border-color: var(--borde-on); }
+#modos .chip { font-size: 0.82rem; letter-spacing: 0.16em; text-transform: uppercase; padding: 0.28rem 0.8rem; }
+#secciones .chip { font-size: 0.85rem; padding: 0.24rem 0.75rem; }
 
-.picto {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
+/* ---------- listado ---------- */
+main { margin-top: 2.4rem; }
+
+.grupo { margin-bottom: 2.6rem; }
+.grupo h3 {
+  font-family: 'Poiret', sans-serif; font-weight: 400;
+  font-size: 0.78rem; letter-spacing: 0.26em; text-transform: uppercase;
+  color: var(--apagado); margin: 0 0 0.2rem;
+  padding-bottom: 0.7rem; border-bottom: 1px solid var(--linea);
 }
 
-.picto svg {
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.ficha {
+  padding: 1.5rem 0 1.35rem;
+  border-bottom: 1px solid var(--linea);
+  transition: opacity .25s ease;
+}
+.ficha.visto { opacity: 0.32; }
+
+.et-fila { display: flex; align-items: baseline; gap: 0.7rem; }
+.et {
+  font-family: 'Poiret', sans-serif; text-transform: uppercase;
+  letter-spacing: 0.22em; font-size: 0.63rem; color: var(--apagado);
+}
+.et.nuevo { color: var(--medio); }
+.et.nuevo::before { content: '· '; }
+
+.ficha h2 {
+  overflow-wrap: break-word;
+  font-family: 'Poiret', sans-serif; font-weight: 400;
+  font-size: 1.4rem; line-height: 1.2; letter-spacing: 0.045em;
+  color: var(--claro); margin: 0.45rem 0 0;
+}
+.ficha h2 a { text-decoration: none; }
+.ficha h2 a:hover { color: #fff; }
+
+.meta {
+  margin: 0.35rem 0 0; font-style: italic; font-size: 0.98rem;
+  color: var(--medio); line-height: 1.35;
+}
+.nota {
+  margin: 0.7rem 0 0; font-size: 1.02rem; line-height: 1.45; color: var(--papel);
 }
 
-/* Header */
+.visto {
+  margin-top: 0.95rem; padding: 0.2rem 0.7rem;
+  font-family: 'Poiret', sans-serif; font-size: 0.72rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--apagado); border: 1px solid var(--linea); border-radius: 999px;
+  cursor: pointer; transition: color .25s ease, border-color .25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.ficha.visto .visto { color: var(--medio); border-color: var(--borde-on); }
 
-header {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 56px 24px 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+.vacio { color: var(--gris); font-style: italic; margin-top: 2rem; }
+
+footer p {
+  margin: 2.5rem 0 0; padding-top: 1.2rem; border-top: 1px solid var(--linea);
+  font-family: 'Poiret', sans-serif; font-size: 0.68rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: #403e3a;
 }
 
-header h1 {
-  font-size: 1.8rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-header h1 .brand-c {
-  color: var(--brand-dark);
-}
-
-header h1 .brand-m {
-  color: var(--brand-light);
-}
-
-header .meta {
-  font-size: 0.8rem;
-  font-weight: 300;
-  color: var(--text-secondary);
-  margin-left: 6px;
-}
-
-/* Filter bar */
-
-.filter-bar {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 24px 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.filter-btn {
-  font-family: "Fraunces", serif;
-  font-size: 0.72rem;
-  font-weight: 400;
-  padding: 5px 12px;
-  border-radius: 24px;
-  border: 1.5px solid var(--border);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.18s ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.filter-btn.active {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
-}
-
-.filter-btn[data-section="museo"].active { background: var(--museo-bg); color: var(--museo-text); border-color: var(--museo-bg); }
-.filter-btn[data-section="concierto"].active { background: var(--concierto-bg); color: var(--concierto-text); border-color: var(--concierto-bg); }
-.filter-btn[data-section="galeria"].active { background: var(--galeria-bg); color: var(--galeria-text); border-color: var(--galeria-bg); }
-.filter-btn[data-section="charla"].active { background: var(--charla-bg); color: var(--charla-text); border-color: var(--charla-bg); }
-.filter-btn[data-section="cine"].active { background: var(--cine-bg); color: var(--cine-text); border-color: var(--cine-bg); }
-.filter-btn[data-section="teatro"].active { background: var(--teatro-bg); color: var(--teatro-text); border-color: var(--teatro-bg); }
-
-.filter-btn:not(.active):hover {
-  color: var(--text);
-  border-color: var(--text-secondary);
-}
-
-/* Per-section hover colors on filter buttons */
-.filter-btn[data-section="museo"]:not(.active):hover { background: var(--museo-bg); border-color: var(--museo-bg); color: var(--museo-text); }
-.filter-btn[data-section="concierto"]:not(.active):hover { background: var(--concierto-bg); border-color: var(--concierto-bg); color: var(--concierto-text); }
-.filter-btn[data-section="galeria"]:not(.active):hover { background: var(--galeria-bg); border-color: var(--galeria-bg); color: var(--galeria-text); }
-.filter-btn[data-section="charla"]:not(.active):hover { background: var(--charla-bg); border-color: var(--charla-bg); color: var(--charla-text); }
-.filter-btn[data-section="cine"]:not(.active):hover { background: var(--cine-bg); border-color: var(--cine-bg); color: var(--cine-text); }
-.filter-btn[data-section="teatro"]:not(.active):hover { background: var(--teatro-bg); border-color: var(--teatro-bg); color: var(--teatro-text); }
-
-/* Mode toggles (kids / selective) — viven en el header, junto al título */
-
-.mode-toggles {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.mode-pill {
-  font-family: "Fraunces", serif;
-  font-size: 0.72rem;
-  font-weight: 400;
-  padding: 4px 12px;
-  border-radius: 24px;
-  border: 1.5px solid var(--border);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: all 0.18s ease;
-}
-
-.mode-pill:hover {
-  color: var(--text);
-  border-color: var(--text-secondary);
-}
-
-.mode-pill.active {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
-}
-
-/* Controls bar */
-
-.controls-bar {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 24px 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-size: 0.72rem;
-}
-
-.sort-links {
-  display: flex;
-  gap: 14px;
-}
-
-.sort-links a {
-  color: var(--text-secondary);
-  text-decoration: none;
-  padding-bottom: 2px;
-  border-bottom: 1.5px solid transparent;
-  transition: all 0.15s ease;
-}
-
-.sort-links a.active {
-  color: var(--text);
-  border-bottom-color: var(--text);
-  font-weight: 500;
-}
-
-.sort-links a:hover { color: var(--text); }
-
-.venue-filter {
-  margin-left: auto;
-}
-
-.venue-select {
-  font-family: "Fraunces", serif;
-  font-size: 0.72rem;
-  font-weight: 400;
-  padding: 4px 28px 4px 10px;
-  border-radius: 24px;
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239A948C' stroke-width='1.2'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  max-width: 200px;
-  transition: all 0.15s ease;
-}
-
-.venue-select:hover, .venue-select:focus {
-  border-color: var(--text-secondary);
-  color: var(--text);
-  outline: none;
-}
-
-/* Main */
-
-main {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 24px 60px;
-}
-
-.empty {
-  text-align: center;
-  padding: 80px 0;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-/* Cards */
-
-.card {
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px 22px;
-  margin-bottom: 12px;
-  transition: box-shadow 0.2s ease;
-}
-
-.card:hover {
-  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.04);
-}
-
-.card.seen {
-  opacity: 0.45;
-}
-
-.card.seen:hover {
-  opacity: 0.7;
-}
-
-.card-bottom {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-.btn-seen {
-  font-family: "Fraunces", serif;
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 4px 11px;
-  border-radius: 24px;
-  border: 1.5px solid var(--border);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.18s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.btn-seen:hover {
-  background: var(--bg);
-  border-color: var(--text-secondary);
-  color: var(--text);
-}
-
-.btn-seen.active {
-  background: var(--concierto-bg);
-  color: var(--concierto-text);
-  border-color: var(--concierto-bg);
-}
-
-.btn-seen.active:hover {
-  background: #b8d9d1;
-  border-color: #b8d9d1;
-}
-
-.card-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 6px;
-}
-
-.card-title-row h2 {
-  font-family: "Fraunces", serif;
-  font-size: 1.08rem;
-  font-weight: 700;
-  line-height: 1.35;
-  flex: 1;
-}
-
-.card-title-row h2 a,
-.card-title-row h2 a:visited,
-.card-title-row h2 a:hover,
-.card-title-row h2 a:active {
-  color: inherit;
-  text-decoration: none;
-  font: inherit;
-  cursor: pointer;
-}
-
-.card-tag-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.tag {
-  font-family: "Fraunces", serif;
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 3px 9px;
-  border-radius: 24px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.badge-new {
-  font-family: "Fraunces", serif;
-  font-size: 0.56rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 2px 7px;
-  border-radius: 24px;
-  background: var(--border);
-  color: var(--text-secondary);
-}
-
-/* Tags — washed versions of the pastel rainbow */
-
-.tag-museo { color: var(--museo-text); background: #FDF6E5; }
-.tag-concierto { color: var(--concierto-text); background: #E4F2EF; }
-.tag-galeria { color: var(--galeria-text); background: #E3EEF8; }
-.tag-charla { color: var(--charla-text); background: #EDE6F8; }
-.tag-cine { color: var(--cine-text); background: #F9E3EC; }
-.tag-teatro { color: var(--teatro-text); background: #FCEDE2; }
-
-/* Venue + dates */
-
-.card-dates {
-  font-size: 0.76rem;
-  font-weight: 400;
-  color: var(--text-venue);
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 4px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-}
-
-.card-where {
-  font-weight: 500;
-  color: var(--text);
-}
-
-.card-sep {
-  margin: 0 6px;
-  color: var(--border);
-}
-
-/* Description — more readable */
-
-.card-description {
-  font-size: 0.82rem;
-  font-weight: 300;
-  color: var(--text-desc);
-  line-height: 1.6;
-  margin-top: 8px;
-}
-
-.card-artist {
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--concierto-text);
-  margin-top: 4px;
-}
-
-
-/* Footer */
-
-footer {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 32px 24px 48px;
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  border-top: 1.5px solid var(--border);
-}
-
-/* Responsive */
-
-@media (min-width: 768px) and (max-width: 1024px) {
-  header { padding-top: 48px; }
-  .card { padding: 24px 26px; }
-}
-
-@media (max-width: 480px) {
-  header h1 { font-size: 1.5rem; }
-  .card-title-row h2 { font-size: 0.96rem; }
-  .card { padding: 16px 18px; border-radius: 10px; }
-  .venue-select { max-width: 140px; font-size: 0.68rem; }
-}
-
-@supports (padding: env(safe-area-inset-top)) {
-  header { padding-top: calc(56px + env(safe-area-inset-top)); }
-  footer { padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
+@media (min-width: 40rem) {
+  body { padding-left: 2.5rem; padding-right: 2.5rem; }
+  #cabecera { padding-top: 6vh; }
+  .ficha h2 { font-size: 1.55rem; }
 }

@@ -22,6 +22,8 @@ Solo JSON, sin explicaciones. Si no hay películas, devuelve [].
 Texto:
 {text}"""
 
+# Embajadores sirve un certificado con cadena incompleta; fetch_html reintenta
+# sin verificar. Por eso nunca había producido nada pese a ser la fuente más rica.
 CINES = [
     ("Cines Renoir", "https://www.cinesrenoir.com/",
      "Cines Renoir (Princesa / Retiro / Plaza de España / Floridablanca)"),

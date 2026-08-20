@@ -1,4 +1,6 @@
-httpx
-beautifulsoup4
-lxml
-anthropic
+# Fijadas a las versiones probadas. Esta app corre una vez por semana sin
+# vigilancia: reproducibilidad por delante de estar al día.
+httpx==0.28.1
+beautifulsoup4==4.14.3
+lxml==6.0.2
+anthropic==0.95.0

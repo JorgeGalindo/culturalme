@@ -1,6 +1,9 @@
 """
 Scraper de exposiciones en museos y espacios de Madrid.
-Modo: LLM (Claude Haiku) — 20 webs heterogéneas.
+Modo: LLM (Claude Haiku).
+
+Sólo fuentes con producción comprobada. Las que devuelven cero de forma
+sostenida se retiran: cada una cuesta una llamada al modelo y 3s de throttle.
 """
 
 import logging
@@ -8,38 +11,28 @@ from scrapers.llm import extract_events
 
 log = logging.getLogger(__name__)
 
-# Cada entrada: (nombre para mostrar, URL de la página de exposiciones)
-# URLs verificadas 2026-04-10
+# Cada entrada: (nombre para mostrar, URL de exposiciones[, corte de texto])
+# Revisadas 2026-08-20.
 FUENTES = [
-    ("Museo del Prado", "https://www.museodelprado.es/en/whats-on/exhibitions"),
-    ("Museo Reina Sofía", "https://www.museoreinasofia.es/exposiciones"),
-    ("Museo Thyssen", "https://www.museothyssen.org/exposiciones"),
-    ("Matadero Madrid", "https://www.mataderomadrid.org/programacion"),
-    # CaixaForum: Cloudflare bloquea todo acceso sin navegador real.
-    # TODO: resolver con playwright.
-    # ("CaixaForum Madrid", "https://caixaforum.org/es/madrid"),
-    ("Fundación Telefónica", "https://espacio.fundaciontelefonica.com/exposiciones/", "Pasadas"),
-    ("La Casa Encendida", "https://www.lacasaencendida.es/exposiciones"),
-    ("Fundación Mapfre", "https://www.fundacionmapfre.org/arte-y-cultura/exposiciones/sala-recoletos/"),
-    ("Sala Canal de Isabel II", "https://www.comunidad.madrid/centros/sala-canal-isabel-ii"),
-    ("Conde Duque", "https://www.condeduquemadrid.es/programacion"),
-    # Imprenta Municipal: madrid.es bloquea bots (403). Revisar periódicamente.
-    # ("Imprenta Municipal", "https://www.madrid.es/..."),
-    ("CBA", "https://www.circulobellasartes.com/exposiciones/"),
-    ("Fundación ICO", "https://www.fundacionico.es/arte"),
-    ("Real Academia de San Fernando", "https://www.realacademiabellasartessanfernando.com/actividades/exposiciones/"),
     ("CentroCentro", "https://www.centrocentro.org/exposiciones"),
-    ("Alcalá 31", "https://www.comunidad.madrid/centros/sala-alcala-31"),
+    ("Museo Reina Sofía", "https://www.museoreinasofia.es/exposiciones"),
+    ("Real Academia de San Fernando", "https://www.realacademiabellasartessanfernando.com/actividades/exposiciones/"),
+    ("Matadero Madrid", "https://www.mataderomadrid.org/programacion"),
+    ("Museo Thyssen", "https://www.museothyssen.org/exposiciones"),
+    ("Fundación Telefónica", "https://espacio.fundaciontelefonica.com/exposiciones/", "Pasadas"),
+    ("CBA", "https://www.circulobellasartes.com/exposiciones/"),
+    ("Sala Canal de Isabel II", "https://www.comunidad.madrid/centros/sala-canal-isabel-ii"),
+    ("Museo Lázaro Galdiano", "https://www.museolazarogaldiano.es/actividades/exposiciones"),
+    ("Fundación Mapfre", "https://www.fundacionmapfre.org/arte-y-cultura/exposiciones/sala-recoletos/"),
+    ("Conde Duque", "https://www.condeduquemadrid.es/programacion"),
     ("Fundación Masaveu", "https://www.fundacioncristinamasaveu.com/"),
+    ("Alcalá 31", "https://www.comunidad.madrid/centros/sala-alcala-31"),
+    # Estas tres sirven cadenas de certificado incompletas; fetch_html reintenta
+    # sin verificar. Estaban muertas desde abril por eso, no por falta de contenido.
     ("Museo de Artes Decorativas", "https://www.culturaydeporte.gob.es/mnartesdecorativas/exposiciones/actuales.html"),
     ("Museo Cerralbo", "https://www.culturaydeporte.gob.es/mcerralbo/actividades/programacion-en-curso.html"),
-    ("Fundación Juan March", "https://www.march.es/es/madrid/exposiciones"),
-    ("Museo Lázaro Galdiano", "https://www.museolazarogaldiano.es/actividades/exposiciones"),
+    ("Fundación ICO", "https://www.fundacionico.es/arte"),
 ]
-
-
-# Títulos a excluir siempre (instalaciones permanentes, etc.)
-EXCLUDE_TITLES = {"Julia"}
 
 
 def scrape() -> list[dict]:
@@ -49,10 +42,8 @@ def scrape() -> list[dict]:
         name, url = entry[0], entry[1]
         truncate = entry[2] if len(entry) > 2 else None
         try:
-            events = extract_events(url, source_name=name, section="museo",
-                                    truncate_before=truncate)
-            events = [e for e in events if e["title"] not in EXCLUDE_TITLES]
-            all_events.extend(events)
+            all_events.extend(extract_events(url, source_name=name, section="museo",
+                                             truncate_before=truncate))
         except Exception:
             log.exception("  ✗ Error scraping %s", name)
     return all_events

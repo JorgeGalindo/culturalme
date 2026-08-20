@@ -1,23 +1,30 @@
 """
 CulturalMe — genera el sitio estático en docs/.
-Lee la DB y genera docs/index.html con todos los datos incrustados como JSON.
-Los filtros, orden y dropdown de sedes funcionan con JS vanilla en el cliente.
+
+Dos planos, porque son dos preguntas distintas:
+  · "Esta semana": lo que tiene día — charlas, teatro y cine.
+  · "Exposiciones": museos y galerías, que duran meses, ordenadas por cierre.
+
+Nada se publica si no se ha visto en la última pasada del pipeline: una fuente
+que deja de listar un evento es la señal de que el evento se acabó.
 """
 
 import json
 import shutil
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "data" / "culturalme.db"
 DOCS_DIR = Path(__file__).parent / "docs"
 STATIC_DIR = Path(__file__).parent / "static"
 
-SECTIONS = ["museo", "concierto", "galeria", "charla", "cine", "teatro"]
-SECTION_LABELS = {
+VENTANA_DIAS = 7
+
+AGENDA = ["charla", "teatro", "cine"]
+EXPOS = ["museo", "galeria"]
+LABELS = {
     "museo": "Museos",
-    "concierto": "Conciertos",
     "galeria": "Galerías",
     "charla": "Charlas",
     "cine": "Cine",
@@ -25,40 +32,25 @@ SECTION_LABELS = {
 }
 
 
-def load_events() -> list[dict]:
-    """Carga eventos vigentes de la DB."""
-    today = date.today().isoformat()
+def load_events():
+    """Carga lo vigente y lo reparte en los dos planos."""
+    today = date.today()
+    hoy = today.isoformat()
+    fin = (today + timedelta(days=VENTANA_DIAS)).isoformat()
+
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
+    row = con.execute("SELECT MAX(last_seen) AS latest FROM events").fetchone()
+    latest = row["latest"] if row and row["latest"] else hoy
 
-    row = con.execute("SELECT MAX(last_seen) as latest FROM events").fetchone()
-    latest_run = row["latest"] if row else today
-
-    # Vigencia:
-    # - cine: siempre (cartelera se reemplaza cada run)
-    # - sin fechas: se muestra (open-ended)
-    # - con date_end (típico exposición): vigente si date_start <= hoy <= date_end
-    #   → exposiciones que aún no han abierto NO aparecen
-    # - sólo date_start (típico concierto puntual): mostrar si es futuro
-    rows = con.execute("""
-        SELECT *, (first_seen = ?) as is_new
-        FROM events
-        WHERE (
-            section = 'cine'
-            OR (date_start IS NULL AND date_end IS NULL)
-            OR (date_end IS NOT NULL
-                AND (date_start IS NULL OR date_start <= ?)
-                AND date_end >= ?)
-            OR (date_end IS NULL AND date_start >= ?)
-        )
-        ORDER BY first_seen DESC, COALESCE(date_start, '9999-12-31') ASC
-    """, (latest_run, today, today, today)).fetchall()
-
+    rows = con.execute(
+        "SELECT * FROM events WHERE last_seen = ? ORDER BY title", (latest,)
+    ).fetchall()
     con.close()
 
-    events = []
+    agenda, expos = [], []
     for r in rows:
-        events.append({
+        e = {
             "title": r["title"],
             "section": r["section"],
             "venue": r["venue"],
@@ -67,246 +59,220 @@ def load_events() -> list[dict]:
             "date_end": r["date_end"],
             "description": r["description"],
             "url": r["url"],
-            "artist_match": r["artist_match"],
-            "first_seen": r["first_seen"],
-            "is_new": bool(r["is_new"]),
-            "kids_friendly": bool(r["kids_friendly"]) if "kids_friendly" in r.keys() else False,
-            "selective": bool(r["selective"]) if "selective" in r.keys() else False,
-        })
+            "is_new": r["first_seen"] == latest,
+            "kids": bool(r["kids_friendly"]),
+            "selecto": bool(r["selective"]),
+        }
+        ini, end = e["date_start"], e["date_end"]
 
-    return events, latest_run
+        if e["section"] == "cine":
+            e["grupo"] = "cine"          # la cartelera es, por definición, la de esta semana
+            agenda.append(e)
+        elif e["section"] in AGENDA:
+            if ini and hoy <= ini <= fin:
+                e["grupo"] = "dia"       # empieza estos días
+                agenda.append(e)
+            elif ini and ini < hoy and (end or ini) >= hoy:
+                e["grupo"] = "cartel"    # ya abierto y sigue toda la semana
+                agenda.append(e)
+        elif e["section"] in EXPOS:
+            abierta = (not ini or ini <= hoy) and (not end or end >= hoy)
+            if abierta:
+                expos.append(e)
+
+    agenda.sort(key=lambda e: (e["date_start"] or "9999", e["title"]))
+    expos.sort(key=lambda e: (e["date_end"] or "9999", e["title"]))
+    return agenda, expos, latest
 
 
 def generate():
-    events, latest_run = load_events()
+    agenda, expos, latest = load_events()
 
     DOCS_DIR.mkdir(exist_ok=True)
-
-    # Copy CSS
     shutil.copy(STATIC_DIR / "style.css", DOCS_DIR / "style.css")
+    if (STATIC_DIR / "fonts").is_dir():
+        shutil.copytree(STATIC_DIR / "fonts", DOCS_DIR / "fonts", dirs_exist_ok=True)
 
-    # Build HTML
-    events_json = json.dumps(events, ensure_ascii=False)
+    def embed(obj):
+        # `</script>` dentro de una cadena cerraría el bloque antes de tiempo.
+        return json.dumps(obj, ensure_ascii=False).replace("</", "<\\/")
 
+    anio = str(date.today().year)
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>CulturalMe — Madrid</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,300;1,9..144,400;1,9..144,700;1,9..144,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<title>CulturalMe — Madrid</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="La agenda cultural de esta semana en Madrid.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1><span class="brand-c">Cultural</span><span class="brand-m">Me</span> <span class="meta">Madrid</span></h1>
-    <div class="mode-toggles">
-      <a href="#" class="mode-pill" data-mode="selective" onclick="toggleMode(event, 'selective')">⭐ Selecto</a>
-      <a href="#" class="mode-pill" data-mode="kids" onclick="toggleMode(event, 'kids')">👶 Niños</a>
-    </div>
-  </header>
 
-  <nav class="filter-bar" id="filterBar"></nav>
+<header id="cabecera">
+  <h1>CulturalMe</h1>
+  <p class="lema">Madrid, esta semana</p>
 
-  <div class="controls-bar">
-    <div class="sort-links">
-      <a href="#" class="active" data-sort="nuevo" onclick="setSort('nuevo')">Más nuevo</a>
-      <a href="#" data-sort="fecha" onclick="setSort('fecha')">Por fecha</a>
-    </div>
-    <div class="venue-filter">
-      <select class="venue-select" id="venueSelect" onchange="render()">
-        <option value="">Todas las sedes</option>
-      </select>
-    </div>
-  </div>
+  <nav class="chips" id="planos">
+    <button class="chip on" data-plano="semana">esta semana</button>
+    <button class="chip" data-plano="expos">exposiciones</button>
+  </nav>
 
-  <main id="cards"></main>
+  <nav class="chips" id="modos">
+    <button class="chip" data-modo="selecto">selecto</button>
+    <button class="chip" data-modo="kids">niños</button>
+  </nav>
 
-  <footer>
-    <p>Actualizado {latest_run}</p>
-  </footer>
+  <nav class="chips" id="secciones"></nav>
+</header>
 
-  <script>
-  const EVENTS = {events_json};
-  const SECTIONS = {json.dumps(SECTIONS)};
-  const LABELS = {json.dumps(SECTION_LABELS, ensure_ascii=False)};
+<main id="lista"></main>
 
-  const PICTOS = {{
-    museo: '<svg viewBox="0 0 16 16"><path d="M2 14V7h12v7"/><path d="M1 7l7-5 7 5"/><path d="M5 14v-4h2v4m2 0v-4h2v4"/></svg>',
-    concierto: '<svg viewBox="0 0 16 16"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="10" r="2"/><path d="M6 12V4l8-2v8"/></svg>',
-    galeria: '<svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="6" cy="7" r="1.5"/><path d="M2 11l3-3 2 2 3-4 4 5"/></svg>',
-    charla: '<svg viewBox="0 0 16 16"><path d="M3 3h10a1 1 0 011 1v6a1 1 0 01-1 1H7l-3 3v-3H3a1 1 0 01-1-1V4a1 1 0 011-1z"/></svg>',
-    cine: '<svg viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="9" rx="1"/><path d="M2 7h12M5 4v3m3-3v3m3-3v3"/><path d="M5 2h6"/></svg>',
-    teatro: '<svg viewBox="0 0 16 16"><path d="M2 4c0 0 2 2 6 2s6-2 6-2"/><path d="M4 6c0 2.5 1.5 5 4 5s4-2.5 4-5"/><circle cx="6" cy="8" r="0.8"/><circle cx="10" cy="8" r="0.8"/><path d="M7 10.5c0 0 .5.5 1 .5s1-.5 1-.5"/></svg>'
-  }};
+<footer><p>Actualizado el {latest}</p></footer>
 
-  let currentSection = 'all';
-  let currentSort = 'nuevo';
-  let modes = (() => {{
-    try {{ return JSON.parse(localStorage.getItem('culturalme_modes') || '{{}}'); }}
-    catch {{ return {{}}; }}
-  }})();
+<script>
+const AGENDA = {embed(agenda)};
+const EXPOS  = {embed(expos)};
+const LABELS = {embed(LABELS)};
 
-  function toggleMode(ev, m) {{
-    ev.preventDefault();
-    modes[m] = !modes[m];
-    localStorage.setItem('culturalme_modes', JSON.stringify(modes));
-    render();
+const ANIO = '{anio}';
+const DIAS = ['dom','lun','mar','mié','jue','vie','sáb'];
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+// Todo el contenido de las tarjetas lo escribe un LLM sobre HTML ajeno.
+// Nada entra en el DOM sin pasar por aquí.
+function esc(s) {{
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}}
+
+function dmy(iso, conAnio) {{
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  return d + ' ' + MESES[m-1] + (conAnio ? ' ' + y : '');
+}}
+function diaLargo(iso) {{
+  const [y,m,d] = iso.split('-').map(Number);
+  const f = new Date(Date.UTC(y, m-1, d));
+  return DIAS[f.getUTCDay()] + ' ' + d + ' ' + MESES[m-1];
+}}
+function cuando(e) {{
+  const a = e.date_start, b = e.date_end;
+  // Una muestra de "1 dic 2025 – 31 oct 2026" sin años se lee al revés.
+  const otro = [a, b].filter(Boolean).some(s => s.slice(0,4) !== ANIO);
+  if (a && b) return a === b ? dmy(a, otro) : dmy(a, otro) + ' – ' + dmy(b, otro);
+  if (a) return dmy(a, otro);
+  if (b) return 'hasta el ' + dmy(b, otro);
+  return '';
+}}
+
+let plano = 'semana';
+let seccion = 'todo';
+let modos = leer('culturalme_modos', {{}});
+let vistos = new Set(leer('culturalme_seen', []));
+
+function leer(k, def) {{
+  try {{ return JSON.parse(localStorage.getItem(k)) ?? def; }} catch {{ return def; }}
+}}
+function clave(e) {{ return e.title + '||' + e.section; }}
+
+function alternarVisto(k) {{
+  vistos.has(k) ? vistos.delete(k) : vistos.add(k);
+  localStorage.setItem('culturalme_seen', JSON.stringify([...vistos]));
+  pintar();
+}}
+
+function tarjeta(e) {{
+  const k = clave(e);
+  const visto = vistos.has(k);
+  const donde = e.venue || (e.source !== e.title ? e.source : '');
+  const fecha = cuando(e);
+  const meta = [donde, fecha].filter(Boolean).map(esc).join(' · ');
+  // La URL también la escribe el LLM: sólo http(s) llega a un href.
+  const href = /^https?:\\/\\//i.test(e.url || '') ? e.url : null;
+  const titulo = href
+    ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(e.title) + '</a>'
+    : esc(e.title);
+  return '<article class="ficha' + (visto ? ' visto' : '') + '">'
+    + '<div class="et-fila"><span class="et">' + esc(LABELS[e.section]) + '</span>'
+    + (e.is_new ? '<span class="et nuevo">nuevo</span>' : '') + '</div>'
+    + '<h2>' + titulo + '</h2>'
+    + (meta ? '<p class="meta">' + meta + '</p>' : '')
+    + (e.description ? '<p class="nota">' + esc(e.description) + '</p>' : '')
+    + '<button class="visto" data-k="' + esc(k) + '">' + (visto ? '✓ visto' : 'visto') + '</button>'
+    + '</article>';
+}}
+
+function grupo(titulo, eventos) {{
+  if (!eventos.length) return '';
+  return '<section class="grupo"><h3>' + esc(titulo) + '</h3>'
+       + eventos.map(tarjeta).join('') + '</section>';
+}}
+
+function pintar() {{
+  const fuente = plano === 'semana' ? AGENDA : EXPOS;
+  const secs = [...new Set(fuente.map(e => e.section))];
+
+  document.getElementById('secciones').innerHTML =
+    (secs.length > 1
+      ? ['todo', ...secs].map(s =>
+          '<button class="chip' + (s === seccion ? ' on' : '') + '" data-sec="' + s + '">'
+          + (s === 'todo' ? 'todo' : esc(LABELS[s]).toLowerCase()) + '</button>').join('')
+      : '');
+
+  let ev = fuente.filter(e =>
+    (seccion === 'todo' || e.section === seccion)
+    && (!modos.kids || e.kids)
+    && (!modos.selecto || e.selecto));
+
+  // Los vistos se van al final sin desaparecer.
+  const orden = a => vistos.has(clave(a)) ? 1 : 0;
+  ev.sort((a,b) => orden(a) - orden(b));
+
+  let html = '';
+  if (!ev.length) {{
+    html = '<p class="vacio">Nada con estos filtros.</p>';
+  }} else if (plano === 'semana') {{
+    const porDia = {{}};
+    ev.filter(e => e.grupo === 'dia').forEach(e => (porDia[e.date_start] ??= []).push(e));
+    Object.keys(porDia).sort().forEach(d => {{ html += grupo(diaLargo(d), porDia[d]); }});
+    html += grupo('en cartel', ev.filter(e => e.grupo === 'cartel'));
+    html += grupo('cine', ev.filter(e => e.grupo === 'cine'));
+  }} else {{
+    html = grupo('abiertas ahora', ev);
   }}
+  document.getElementById('lista').innerHTML = html;
 
-  function seenKey(e) {{ return e.title + '||' + e.section; }}
-  function getSeen() {{ try {{ return JSON.parse(localStorage.getItem('culturalme_seen') || '[]'); }} catch {{ return []; }} }}
-  function isSeen(e) {{ return getSeen().includes(seenKey(e)); }}
-  function toggleSeen(e) {{
-    let s = getSeen();
-    const k = seenKey(e);
-    if (s.includes(k)) s = s.filter(x => x !== k);
-    else s.push(k);
-    localStorage.setItem('culturalme_seen', JSON.stringify(s));
-    render();
+  document.querySelectorAll('#planos .chip').forEach(c =>
+    c.classList.toggle('on', c.dataset.plano === plano));
+  document.querySelectorAll('#modos .chip').forEach(c =>
+    c.classList.toggle('on', !!modos[c.dataset.modo]));
+}}
+
+document.addEventListener('click', ev => {{
+  const c = ev.target.closest('button');
+  if (!c) return;
+  if (c.dataset.plano) {{ plano = c.dataset.plano; seccion = 'todo'; pintar(); }}
+  else if (c.dataset.modo) {{
+    modos[c.dataset.modo] = !modos[c.dataset.modo];
+    localStorage.setItem('culturalme_modos', JSON.stringify(modos));
+    pintar();
   }}
+  else if (c.dataset.sec) {{ seccion = c.dataset.sec; pintar(); }}
+  else if (c.dataset.k) {{ alternarVisto(c.dataset.k); }}
+}});
 
-  function picto(s) {{ return '<span class="picto">' + PICTOS[s] + '</span>'; }}
-
-  function buildFilters() {{
-    const bar = document.getElementById('filterBar');
-    bar.innerHTML = '<a href="#" class="filter-btn active" onclick="setSection(\\'all\\')">todo</a>';
-    SECTIONS.forEach(s => {{
-      bar.innerHTML += `<a href="#" class="filter-btn" data-section="${{s}}" onclick="setSection('${{s}}')">${{picto(s)}} ${{LABELS[s]}}</a>`;
-    }});
-  }}
-
-  function setSection(s) {{
-    currentSection = s;
-    render();
-  }}
-
-  function setSort(s) {{
-    currentSort = s;
-    render();
-  }}
-
-  function render() {{
-    const venue = document.getElementById('venueSelect').value;
-
-    // Filter
-    let filtered = EVENTS.filter(e => {{
-      if (currentSection !== 'all' && e.section !== currentSection) return false;
-      if (venue && e.source !== venue && e.venue !== venue) return false;
-      if (modes.kids && !e.kids_friendly) return false;
-      if (modes.selective && !e.selective) return false;
-      return true;
-    }});
-
-    // Sort
-    const seenSet = new Set(getSeen());
-    if (currentSort === 'fecha') {{
-      filtered.sort((a, b) => {{
-        const sa = seenSet.has(seenKey(a)) ? 1 : 0;
-        const sb = seenSet.has(seenKey(b)) ? 1 : 0;
-        if (sa !== sb) return sa - sb;
-        const da = a.date_end || a.date_start || '9999-12-31';
-        const db = b.date_end || b.date_start || '9999-12-31';
-        return da.localeCompare(db) || (b.first_seen || '').localeCompare(a.first_seen || '');
-      }});
-    }} else {{
-      filtered.sort((a, b) => {{
-        const sa = seenSet.has(seenKey(a)) ? 1 : 0;
-        const sb = seenSet.has(seenKey(b)) ? 1 : 0;
-        if (sa !== sb) return sa - sb;
-        const fa = b.first_seen || '';
-        const fb = a.first_seen || '';
-        if (fa !== fb) return fa.localeCompare(fb);
-        const da = a.date_start || '9999-12-31';
-        const db = b.date_start || '9999-12-31';
-        return da.localeCompare(db);
-      }});
-    }}
-
-    // Update filter buttons
-    document.querySelectorAll('.filter-btn').forEach(btn => {{
-      const s = btn.getAttribute('data-section') || 'all';
-      btn.classList.toggle('active', s === (currentSection === 'all' && !btn.dataset.section ? 'all' : currentSection));
-    }});
-    // Fix: simpler active logic
-    document.querySelectorAll('.filter-btn').forEach(btn => {{
-      const isAll = !btn.dataset.section;
-      btn.classList.toggle('active', isAll ? currentSection === 'all' : btn.dataset.section === currentSection);
-    }});
-
-    // Update sort links
-    document.querySelectorAll('.sort-links a').forEach(a => {{
-      a.classList.toggle('active', a.dataset.sort === currentSort);
-    }});
-
-    // Update mode pills
-    document.querySelectorAll('.mode-pill').forEach(a => {{
-      a.classList.toggle('active', !!modes[a.dataset.mode]);
-    }});
-
-    // Update venue dropdown
-    const venueSet = new Set();
-    EVENTS.forEach(e => {{
-      if (currentSection === 'all' || e.section === currentSection) {{
-        venueSet.add(e.source);
-      }}
-    }});
-    const sel = document.getElementById('venueSelect');
-    const curVenue = sel.value;
-    sel.innerHTML = '<option value="">Todas las sedes</option>';
-    [...venueSet].sort().forEach(v => {{
-      sel.innerHTML += `<option value="${{v}}" ${{v === curVenue ? 'selected' : ''}}>${{v}}</option>`;
-    }});
-
-    // Render cards
-    const main = document.getElementById('cards');
-    if (!filtered.length) {{
-      main.innerHTML = '<div class="empty"><p>No hay eventos con estos filtros.</p></div>';
-      return;
-    }}
-
-    main.innerHTML = filtered.map(e => {{
-      const where = e.venue || (e.source !== e.title ? e.source : '');
-      const hasDate = e.date_start || e.date_end;
-      let dateStr = '';
-      if (e.date_start && e.date_end) dateStr = e.date_start + ' — ' + e.date_end;
-      else if (e.date_start) dateStr = e.date_start;
-      else if (e.date_end) dateStr = 'Hasta ' + e.date_end;
-
-      const seen = isSeen(e);
-      return `<article class="card${{seen ? ' seen' : ''}}">
-        <div class="card-title-row">
-          <h2>${{e.url ? '<a href="' + e.url + '" target="_blank" rel="noopener">' + e.title + '</a>' : e.title}}</h2>
-          <div class="card-tag-badge">
-            <span class="tag tag-${{e.section}}">${{picto(e.section)}} ${{LABELS[e.section]}}</span>
-            ${{e.is_new ? '<span class="badge-new">nuevo</span>' : ''}}
-          </div>
-        </div>
-        <div class="card-dates">
-          ${{where ? '<span class="card-where">' + where + '</span>' : ''}}
-          ${{where && hasDate ? '<span class="card-sep">&middot;</span>' : ''}}
-          ${{dateStr}}
-        </div>
-        ${{e.artist_match ? '<p class="card-artist">' + e.artist_match + '</p>' : ''}}
-        ${{e.description ? '<p class="card-description">' + e.description + '</p>' : ''}}
-        <div class="card-bottom">
-          <button class="btn-seen ${{seen ? 'active' : ''}}" onclick="toggleSeen(EVENTS[${{EVENTS.indexOf(e)}}])">${{seen ? '✓ Visto' : 'Visto'}}</button>
-        </div>
-      </article>`;
-    }}).join('');
-  }}
-
-  buildFilters();
-  render();
-  </script>
+pintar();
+</script>
 </body>
 </html>"""
 
-    (DOCS_DIR / "index.html").write_text(html)
-    print(f"Generated docs/index.html — {len(events)} events, {latest_run}")
+    (DOCS_DIR / "index.html").write_text(html, encoding="utf-8")
+    print(f"docs/index.html — {len(agenda)} esta semana, {len(expos)} exposiciones, datos del {latest}")
 
 
 if __name__ == "__main__":
