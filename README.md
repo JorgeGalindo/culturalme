@@ -67,6 +67,7 @@ Cada fuente muerta costaba una llamada al modelo y hasta 15s de reintentos.
 - **`event_id` = `source|title|venue`, sin fecha.** La fecha es el dato que el LLM extrae peor; con ella en
   la clave, cada lectura errónea creaba una fila nueva (el mismo montaje llegó a estar cuatro veces con
   cuatro años distintos). Ahora las fechas se actualizan encima de la fila que ya existe.
+- **Cada sección se guarda en una transacción.** Si una fila falla, se deshacen también las eliminaciones y actualizaciones de esa sección. Cine retira lo que sale de cartel, pero conserva la fecha de incorporación y las etiquetas de las películas que siguen. Si cambia el contenido usado para etiquetar un evento, se solicita de nuevo su clasificación.
 - **Las fechas se validan en Python, no se le confían al modelo.** La fecha de hoy va en el prompt, y luego
   se exige `YYYY-MM-DD` dentro de una ventana de `[hoy−2 años, hoy+18 meses]`. Un `date_end` anterior al
   `date_start` se interpreta como cruce de año ("del 9 de julio al 10 de enero") y salta al año siguiente.
@@ -117,6 +118,14 @@ python pipeline.py    # scrape + tag
 python generate.py    # genera docs/index.html
 open docs/index.html
 ```
+
+## Pruebas locales
+
+```bash
+python3 -B -m unittest discover -s tests -v
+```
+
+Comprueban sustituciones de cartelera, recuperación tras errores de escritura y saneado de fechas. Usan SQLite en memoria y datos ficticios, sin modificar `data/culturalme.db` ni llamar al modelo.
 
 ## Setup CI
 

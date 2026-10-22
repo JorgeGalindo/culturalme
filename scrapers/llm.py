@@ -245,7 +245,7 @@ def sanitize_dates(event: dict) -> dict:
             bumped = end.replace(year=end.year + 1)
         except ValueError:  # 29 de febrero
             bumped = None
-        end = bumped if bumped and _parse_date(bumped.isoformat()) else None
+        end = bumped if bumped and bumped >= start and _parse_date(bumped.isoformat()) else None
 
     event["date_start"] = start.isoformat() if start else None
     event["date_end"] = end.isoformat() if end else None

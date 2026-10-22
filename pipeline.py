@@ -87,15 +87,14 @@ def store_events(con: sqlite3.Connection, section: str, events: list[dict],
                   replace: bool = False):
     """Inserta o actualiza los eventos de una sección.
 
-    replace=True vacía la sección primero (cine: la cartelera no acumula).
+    replace=True retira lo que ya no aparece (cine: la cartelera no acumula),
+    conservando first_seen y etiquetas de las películas que siguen en cartel.
+    La sustitución completa es atómica: un error no deja una sección a medias.
     En un evento ya conocido se refrescan fechas, descripción y URL: la
     fuente es la autoridad, y un date_end que se alarga es información nueva.
     """
     today = date.today().isoformat()
     events = [e for e in events if not _is_excluded(e)]
-
-    if replace:
-        con.execute("DELETE FROM events WHERE section = ?", (section,))
 
     # Una misma página suele listar el mismo evento varias veces, y no siempre
     # con los mismos datos: una lectura trae las fechas y otra no. Se funden
@@ -112,25 +111,38 @@ def store_events(con: sqlite3.Connection, section: str, events: list[dict],
         else:
             fundidos[eid] = dict(e)
 
-    for eid, e in fundidos.items():
-        row = (e["section"], e["title"], e.get("venue"), e.get("date_start"),
-               e.get("date_end"), e.get("description"), e.get("url"), e["source"])
-        if con.execute("SELECT 1 FROM events WHERE id = ?", (eid,)).fetchone():
-            con.execute(
-                """UPDATE events SET section=?, title=?, venue=?, date_start=?,
-                   date_end=?, description=?, url=?, source=?, last_seen=?
-                   WHERE id=?""",
-                (*row, today, eid),
-            )
-        else:
-            con.execute(
-                """INSERT INTO events
-                   (section, title, venue, date_start, date_end, description,
-                    url, source, first_seen, last_seen, id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (*row, today, today, eid),
-            )
-    con.commit()
+    with con:
+        if replace:
+            existing = con.execute("SELECT id FROM events WHERE section = ?", (section,))
+            removed = [(eid,) for (eid,) in existing if eid not in fundidos]
+            con.executemany("DELETE FROM events WHERE id = ?", removed)
+
+        for eid, e in fundidos.items():
+            row = (e["section"], e["title"], e.get("venue"), e.get("date_start"),
+                   e.get("date_end"), e.get("description"), e.get("url"), e["source"])
+            previous = con.execute(
+                "SELECT title, section, venue, source, description FROM events WHERE id = ?", (eid,)
+            ).fetchone()
+            if previous:
+                tagged_content = (e["title"], e["section"], e.get("venue"), e["source"], e.get("description"))
+                if previous != tagged_content:
+                    con.execute(
+                        "UPDATE events SET kids_friendly=NULL, selective=NULL, tags_hash=NULL WHERE id=?", (eid,)
+                    )
+                con.execute(
+                    """UPDATE events SET section=?, title=?, venue=?, date_start=?,
+                       date_end=?, description=?, url=?, source=?, last_seen=?
+                       WHERE id=?""",
+                    (*row, today, eid),
+                )
+            else:
+                con.execute(
+                    """INSERT INTO events
+                       (section, title, venue, date_start, date_end, description,
+                        url, source, first_seen, last_seen, id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (*row, today, today, eid),
+                )
 
 
 def purge_stale(con: sqlite3.Connection):
