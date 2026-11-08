@@ -1,34 +1,36 @@
 """
-CulturalMe — genera el sitio estático en docs/.
+CulturalMe — genera el sitio estático en docs/ (lo sirve Vercel).
 
-Cuatro pestañas por tipo de actividad: exposiciones, cine, teatro y charlas.
-No hay ventana temporal: se muestra todo lo vigente. La v2 probó a recortar a
-"esta semana" y en agosto la agenda salía vacía — en Madrid la temporada
-arranca en septiembre, así que el recorte escondía el catálogo entero.
+Arriba, la portada de la semana (curate.py): los planes que Claude elige con el
+manifiesto de Jorge, cada uno con su por qué, y los de ir con los niños.
+Debajo, las exposiciones que cierran en las dos próximas semanas. Y al final
+todo lo demás para buscar: cinco pestañas por tipo, orden por fecha de cierre.
 
-Orden por defecto: fecha de fin ascendente, lo que cierra antes arriba.
-Alternativa a un toque: lo recién detectado por el scraper.
-
-Nada se publica si no se ha visto en la última pasada del pipeline: una fuente
-que deja de listar un evento es la señal de que el evento se acabó.
+Lo publicado es lo que vio la última lectura buena de cada fuente
+(pipeline.published). La página se genera una vez por semana, así que es el
+navegador el que esconde, con la fecha de cada día, lo que ya ha terminado.
 """
 
 import json
+import re
 import shutil
 import sqlite3
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "data" / "culturalme.db"
+import curate
+import pipeline
+
 DOCS_DIR = Path(__file__).parent / "docs"
 STATIC_DIR = Path(__file__).parent / "static"
 
 # (clave, rótulo, secciones que agrupa)
 PLANOS = [
     ("expos", "exposiciones", ["museo", "galeria"]),
-    ("cine", "cine", ["cine"]),
     ("teatro", "teatro", ["teatro"]),
     ("charlas", "charlas", ["charla"]),
+    ("musica", "música", ["musica"]),
+    ("cine", "cine", ["cine"]),
 ]
 PLANO_DE = {sec: clave for clave, _, secs in PLANOS for sec in secs}
 
@@ -38,51 +40,71 @@ LABELS = {
     "charla": "Charlas",
     "cine": "Cine",
     "teatro": "Teatro",
+    "musica": "Música",
 }
 
 
-def load_events():
-    """Carga lo vigente de la última pasada y lo reparte por pestañas."""
+# Rótulo de una sola pieza, para la línea de arriba de cada plan de la portada.
+KICKER = {"museo": "Exposición", "galeria": "Galería", "charla": "Charla", "cine": "Cine",
+          "teatro": "Teatro", "musica": "Concierto"}
+
+
+def tidy_title(title: str, section: str = "") -> str:
+    """Las webs que titulan EN MAYÚSCULAS pasan a minúsculas con mayúscula inicial
+    (también tras punto, barra vertical o comillas); en música, que son nombres de
+    artista, cada palabra con mayúscula. Lo que ya viene mezclado no se toca."""
+    letters = [c for c in title if c.isalpha()]
+    if len(letters) < 6 or sum(c.isupper() for c in letters) < 0.85 * len(letters):
+        return title
+    if section == "musica":
+        return " ".join(w[:1].upper() + w[1:].lower() for w in title.split(" "))
+    out = title.lower()
+    return re.sub(r"(^|[.|:«\"]\s*|\s[-–—]\s*)(\w)", lambda m: m.group(1) + m.group(2).upper(), out)
+
+
+def vigente(sec: str, ini: str | None, fin: str | None, hoy: str) -> bool:
+    """Sigue vivo lo que aún no ha terminado.
+      · cine: la cartelera es la de la última lectura, siempre vale
+      · con fecha de fin: vale hasta que llega
+      · exposición sólo con fecha de inicio: vale (no sabemos cuándo cierra; deja
+        de publicarse cuando su web deja de listarla)
+      · otra cosa sólo con fecha de inicio: vale si no ha pasado
+      · sin fechas: se muestra, es lo único que podemos hacer con ello
+    La página repite esta misma regla cada día en el navegador."""
+    if sec == "cine" or (sec in ("museo", "galeria") and not fin):
+        return True
+    if fin:
+        return fin >= hoy
+    if ini:
+        return ini >= hoy
+    return True
+
+
+def load_events(con: sqlite3.Connection | None = None):
     hoy = date.today().isoformat()
-
-    con = sqlite3.connect(DB_PATH)
-    con.row_factory = sqlite3.Row
-    fila = con.execute("SELECT MAX(last_seen) AS latest FROM events").fetchone()
-    latest = fila["latest"] if fila and fila["latest"] else hoy
-
-    rows = con.execute(
-        "SELECT * FROM events WHERE last_seen = ? ORDER BY title", (latest,)
-    ).fetchall()
-    con.close()
+    own = con is None
+    con = con or pipeline.init_db()
+    try:
+        rows = pipeline.published(con)
+        latest = con.execute("SELECT MAX(last_ok) FROM sources").fetchone()[0]
+        latest = latest or con.execute("SELECT MAX(last_seen) FROM events").fetchone()[0] or hoy
+    finally:
+        if own:
+            con.close()
 
     eventos = []
     for r in rows:
-        ini_f, fin_f, sec = r["date_start"], r["date_end"], r["section"]
-
-        # Vigencia: sigue vivo lo que aún no ha terminado.
-        #   · cine: la cartelera se reemplaza entera cada pasada, siempre vale
-        #   · con fecha de fin: vale hasta que llega
-        #   · sólo con fecha de inicio: vale si no ha pasado
-        #   · sin fechas: se muestra, es lo único que podemos hacer con ello
-        if sec == "cine":
-            vigente = True
-        elif fin_f:
-            vigente = fin_f >= hoy
-        elif ini_f:
-            vigente = ini_f >= hoy
-        else:
-            vigente = True
-        if not vigente:
+        if r["section"] not in PLANO_DE or not vigente(r["section"], r["date_start"], r["date_end"], hoy):
             continue
-
         eventos.append({
-            "title": r["title"],
-            "section": sec,
-            "plano": PLANO_DE[sec],
+            "id": r["id"],
+            "title": tidy_title(r["title"], r["section"]),
+            "section": r["section"],
+            "plano": PLANO_DE[r["section"]],
             "venue": r["venue"],
             "source": r["source"],
-            "date_start": ini_f,
-            "date_end": fin_f,
+            "date_start": r["date_start"],
+            "date_end": r["date_end"],
             "description": r["description"],
             "url": r["url"],
             "first_seen": r["first_seen"],
@@ -90,12 +112,12 @@ def load_events():
             "kids": bool(r["kids_friendly"]),
             "selecto": bool(r["selective"]),
         })
-
     return eventos, latest
 
 
 def generate():
     eventos, latest = load_events()
+    cura = curate.load() or {"semana": [], "ninos": []}
 
     DOCS_DIR.mkdir(exist_ok=True)
     shutil.copy(STATIC_DIR / "style.css", DOCS_DIR / "style.css")
@@ -110,7 +132,7 @@ def generate():
         f'<button class="chip{" on" if i == 0 else ""}" data-plano="{clave}">{rotulo}</button>'
         for i, (clave, rotulo, _) in enumerate(PLANOS)
     )
-    anio = str(date.today().year)
+    cura_js = {k: cura.get(k, []) for k in ("semana", "ninos", "desde", "hasta")}
 
     html = f"""<!DOCTYPE html>
 <html lang="es">
@@ -119,7 +141,7 @@ def generate():
 <title>CulturalMe — Madrid</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
-<meta name="description" content="Agenda cultural de Madrid: exposiciones, cine, teatro y charlas.">
+<meta name="description" content="Agenda cultural de Madrid: lo que merece la pena esta semana.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="stylesheet" href="style.css">
@@ -128,55 +150,131 @@ def generate():
 
 <header id="cabecera">
   <h1>CulturalMe</h1>
-  <p class="lema">Madrid</p>
+  <p class="lema" id="lema">Madrid</p>
+</header>
 
+<section id="portada">
+  <h2 class="bloque" id="t-semana">Esta semana</h2>
+  <div id="semana"></div>
+  <h2 class="bloque" id="t-ninos">Con los niños</h2>
+  <div id="ninos"></div>
+  <h2 class="bloque" id="t-pronto">Se acaba pronto</h2>
+  <ul id="pronto"></ul>
+</section>
+
+<section id="todo">
+  <h2 class="bloque">Todo</h2>
   <nav class="chips" id="planos">{chips}</nav>
   <nav class="chips" id="modos">
     <button class="chip" data-modo="selecto">selecto</button>
     <button class="chip" data-modo="kids">niños</button>
   </nav>
   <nav class="chips" id="secciones"></nav>
-
   <nav class="orden" id="orden">
     <button class="on" data-orden="fecha">por fecha</button>
     <button data-orden="nuevo">más nuevo</button>
   </nav>
-</header>
-
-<main id="lista"></main>
+  <main id="lista"></main>
+</section>
 
 <footer><p>Actualizado el {latest}</p></footer>
 
 <script>
 const EVENTOS = {embed(eventos)};
+const CURA = {embed(cura_js)};
 const PLANOS = {embed([[c, r, secs] for c, r, secs in PLANOS])};
 const LABELS = {embed(LABELS)};
-const ANIO = '{anio}';
+const KICKER = {embed(KICKER)};
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const DIAS = ['dom','lun','mar','mié','jue','vie','sáb'];
+const PRONTO_DIAS = 14;
 
-// Todo el contenido de las tarjetas lo escribe un LLM sobre HTML ajeno.
-// Nada entra en el DOM sin pasar por aquí.
+// La fecha de hoy en Madrid, la del día en que se abre la página (no la de la pasada).
+function isoMadrid(d) {{ return d.toLocaleDateString('sv-SE', {{ timeZone: 'Europe/Madrid' }}); }}
+const HOY = isoMadrid(new Date());
+const ANIO = HOY.slice(0, 4);
+const LIMITE_PRONTO = isoMadrid(new Date(Date.now() + PRONTO_DIAS * 864e5));
+
+// Misma regla que vigente() en generate.py, pero con la fecha de hoy.
+const EXPO = s => s === 'museo' || s === 'galeria';
+function vigente(e) {{
+  if (e.section === 'cine' || (EXPO(e.section) && !e.date_end)) return true;
+  if (e.date_end) return e.date_end >= HOY;
+  if (e.date_start) return e.date_start >= HOY;
+  return true;
+}}
+const VIVOS = EVENTOS.filter(vigente);
+const POR_ID = Object.fromEntries(VIVOS.map(e => [e.id, e]));
+
+// Todo el contenido lo escribe un LLM sobre HTML ajeno. Nada entra en el DOM sin pasar por aquí.
 function esc(s) {{
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }}
 
-function dmy(iso, conAnio) {{
-  if (!iso) return '';
-  const [y,m,d] = iso.split('-').map(Number);
+function partes(iso) {{ return iso.split('-').map(Number); }}
+function dm(iso, conAnio) {{
+  const [y, m, d] = partes(iso);
   return d + ' ' + MESES[m-1] + (conAnio ? ' ' + y : '');
+}}
+function dia(iso) {{
+  const [y, m, d] = partes(iso);
+  return DIAS[new Date(y, m-1, d).getDay()] + ' ' + dm(iso, y !== +ANIO);
 }}
 function cuando(e) {{
   const a = e.date_start, b = e.date_end;
-  // Una muestra de "1 dic 2025 – 31 oct 2026" sin años se lee al revés.
   const otro = [a, b].filter(Boolean).some(s => s.slice(0,4) !== ANIO);
-  if (a && b) return a === b ? dmy(a, otro) : dmy(a, otro) + ' – ' + dmy(b, otro);
-  if (a) return dmy(a, otro);
-  if (b) return 'hasta el ' + dmy(b, otro);
+  if (a && !b && EXPO(e.section)) return a > HOY ? 'desde el ' + dm(a, otro) : '';  // expo sin cierre conocido
+  if (a && (!b || a === b)) return dia(a);           // un solo día: con día de la semana
+  if (b && (!a || a <= HOY)) return 'hasta el ' + dm(b, otro);  // ya abierta: lo que importa es el cierre
+  if (a && b) return dm(a, otro) + ' – ' + dm(b, otro);
   return '';
 }}
+function cierre(e) {{
+  if (e.date_end === HOY) return 'último día hoy';
+  const [y, m, d] = partes(e.date_end);
+  return 'cierra el ' + DIAS[new Date(y, m-1, d).getDay()] + ' ' + dm(e.date_end, false);
+}}
+function donde(e) {{ return e.venue || e.source || ''; }}
+// La URL también la escribe el LLM: sólo http(s) llega a un href.
+function enlace(e, texto) {{
+  const href = /^https?:\\/\\//i.test(e.url || '') ? e.url : null;
+  return href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(texto) + '</a>' : esc(texto);
+}}
 
+// ---------- portada ----------
+function destacada(p) {{
+  const e = POR_ID[p.id];
+  const kicker = [KICKER[e.section], donde(e), cuando(e)].filter(Boolean).map(esc).join(' · ');
+  return '<article class="destacada">'
+    + '<p class="kicker">' + kicker + '</p>'
+    + '<h3>' + enlace(e, e.title) + '</h3>'
+    + '<p class="porque">' + esc(p.por_que) + '</p>'
+    + '</article>';
+}}
+function bloque(id, picks) {{
+  const vivos = (picks || []).filter(p => POR_ID[p.id]);
+  document.getElementById(id).innerHTML = vivos.map(destacada).join('');
+  document.getElementById('t-' + id).hidden = !vivos.length;
+}}
+bloque('semana', CURA.semana);
+bloque('ninos', CURA.ninos);
+
+const pronto = VIVOS
+  .filter(e => (e.section === 'museo' || e.section === 'galeria') && e.date_end && e.date_end <= LIMITE_PRONTO)
+  .sort((a, b) => a.date_end.localeCompare(b.date_end) || (b.selecto - a.selecto));
+document.getElementById('pronto').innerHTML = pronto.map(e =>
+  '<li' + (e.selecto ? ' class="selecto"' : '') + '>' + enlace(e, e.title)
+  + '<span class="meta"> · ' + esc(donde(e)) + ' · ' + esc(cierre(e)) + '</span></li>').join('');
+document.getElementById('t-pronto').hidden = !pronto.length;
+
+if (CURA.desde && CURA.hasta) {{
+  const desde = HOY > CURA.desde ? HOY : CURA.desde;
+  document.getElementById('lema').textContent = 'Madrid · del ' + dm(desde) + ' al ' + dm(CURA.hasta);
+}}
+
+// ---------- todo ----------
 // El orden por defecto es la fecha de fin: lo que cierra antes, arriba.
 function fin(e) {{ return e.date_end || e.date_start || '9999-12-31'; }}
 
@@ -200,26 +298,21 @@ function alternarVisto(k) {{
 function tarjeta(e) {{
   const k = clave(e);
   const visto = vistos.has(k);
-  const donde = e.venue || (e.source !== e.title ? e.source : '');
-  const meta = [donde, cuando(e)].filter(Boolean).map(esc).join(' · ');
-  // La URL también la escribe el LLM: sólo http(s) llega a un href.
-  const href = /^https?:\\/\\//i.test(e.url || '') ? e.url : null;
-  const titulo = href
-    ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(e.title) + '</a>'
-    : esc(e.title);
+  const meta = [donde(e), cuando(e)].filter(Boolean).map(esc).join(' · ');
   return '<article class="ficha' + (visto ? ' visto' : '') + '">'
     + '<div class="et-fila"><span class="et">' + esc(LABELS[e.section]) + '</span>'
-    + (e.is_new ? '<span class="et nuevo">nuevo</span>' : '') + '</div>'
-    + '<h2>' + titulo + '</h2>'
+    + (e.is_new ? '<span class="et nuevo">nuevo</span>' : '')
+    + (e.selecto ? '<span class="et selecto">selecto</span>' : '') + '</div>'
+    + '<h3>' + enlace(e, e.title) + '</h3>'
     + (meta ? '<p class="meta">' + meta + '</p>' : '')
     + (e.description ? '<p class="nota">' + esc(e.description) + '</p>' : '')
-    + '<button class="visto" data-k="' + esc(k) + '">' + (visto ? '✓ visto' : 'visto') + '</button>'
+    + '<button class="visto" data-k="' + esc(k) + '">' + (visto ? '✓ visto' : 'marcar visto') + '</button>'
     + '</article>';
 }}
 
 function pintar() {{
   const secs = PLANOS.find(p => p[0] === plano)[2];
-  const enPlano = EVENTOS.filter(e => e.plano === plano);
+  const enPlano = VIVOS.filter(e => e.plano === plano);
 
   // Los chips de sección sólo tienen sentido donde la pestaña agrupa varias.
   const presentes = secs.filter(s => enPlano.some(e => e.section === s));
@@ -250,8 +343,11 @@ function pintar() {{
     ? ev.map(tarjeta).join('')
     : '<p class="vacio">Nada con estos filtros.</p>';
 
-  document.querySelectorAll('#planos .chip').forEach(c =>
-    c.classList.toggle('on', c.dataset.plano === plano));
+  document.querySelectorAll('#planos .chip').forEach(c => {{
+    const n = VIVOS.filter(e => e.plano === c.dataset.plano).length;
+    c.classList.toggle('on', c.dataset.plano === plano);
+    c.hidden = !n;
+  }});
   document.querySelectorAll('#modos .chip').forEach(c =>
     c.classList.toggle('on', !!modos[c.dataset.modo]));
   document.querySelectorAll('#orden button').forEach(b =>
@@ -282,7 +378,8 @@ pintar();
         f"{rotulo} {sum(1 for e in eventos if e['plano'] == clave)}"
         for clave, rotulo, _ in PLANOS
     )
-    print(f"docs/index.html — {reparto} · datos del {latest}")
+    print(f"docs/index.html — {reparto} · portada {len(cura.get('semana', []))}+{len(cura.get('ninos', []))}"
+          f" · datos del {latest}")
 
 
 if __name__ == "__main__":

@@ -1,49 +1,38 @@
 """
-Scraper de exposiciones en museos y espacios de Madrid.
-Modo: LLM (Claude Haiku).
+Exposiciones en museos y centros de Madrid.
 
 Sólo fuentes con producción comprobada. Las que devuelven cero de forma
-sostenida se retiran: cada una cuesta una llamada al modelo y 3s de throttle.
+sostenida se retiran: cada una cuesta una llamada al modelo.
+Fuera por protección antibots (no se intenta saltar): Museo del Prado (403).
 """
 
-import logging
-from scrapers.llm import extract_events
+from scrapers.llm import Fuente, extract
 
-log = logging.getLogger(__name__)
-
-# Cada entrada: (nombre para mostrar, URL de exposiciones[, corte de texto])
-# Revisadas 2026-08-20.
+# Revisadas 2026-08-20; Casa Encendida, Museo ABC y BNE añadidas 2026-11-08.
 FUENTES = [
-    ("CentroCentro", "https://www.centrocentro.org/exposiciones"),
-    ("Museo Reina Sofía", "https://www.museoreinasofia.es/exposiciones"),
-    ("Real Academia de San Fernando", "https://www.realacademiabellasartessanfernando.com/actividades/exposiciones/"),
-    ("Matadero Madrid", "https://www.mataderomadrid.org/programacion"),
-    ("Museo Thyssen", "https://www.museothyssen.org/exposiciones"),
-    ("Fundación Telefónica", "https://espacio.fundaciontelefonica.com/exposiciones/", "Pasadas"),
-    ("CBA", "https://www.circulobellasartes.com/exposiciones/"),
-    ("Sala Canal de Isabel II", "https://www.comunidad.madrid/centros/sala-canal-isabel-ii"),
-    ("Museo Lázaro Galdiano", "https://www.museolazarogaldiano.es/actividades/exposiciones"),
-    ("Fundación Mapfre", "https://www.fundacionmapfre.org/arte-y-cultura/exposiciones/sala-recoletos/"),
-    ("Conde Duque", "https://www.condeduquemadrid.es/programacion"),
-    ("Fundación Masaveu", "https://www.fundacioncristinamasaveu.com/"),
-    ("Alcalá 31", "https://www.comunidad.madrid/centros/sala-alcala-31"),
+    Fuente("CentroCentro", "https://www.centrocentro.org/exposiciones", "museo"),
+    Fuente("Museo Reina Sofía", "https://www.museoreinasofia.es/exposiciones", "museo"),
+    Fuente("Real Academia de San Fernando", "https://www.realacademiabellasartessanfernando.com/actividades/exposiciones/", "museo"),
+    Fuente("Matadero Madrid", "https://www.mataderomadrid.org/programacion", "agenda"),
+    Fuente("Museo Thyssen", "https://www.museothyssen.org/exposiciones", "museo"),
+    Fuente("Fundación Telefónica", "https://espacio.fundaciontelefonica.com/exposiciones/", "museo", cut="Pasadas"),
+    Fuente("Círculo de Bellas Artes", "https://www.circulobellasartes.com/exposiciones/", "museo"),
+    Fuente("Sala Canal de Isabel II", "https://www.comunidad.madrid/centros/sala-canal-isabel-ii", "museo"),
+    Fuente("Museo Lázaro Galdiano", "https://www.museolazarogaldiano.es/actividades/exposiciones", "museo"),
+    Fuente("Fundación Mapfre", "https://www.fundacionmapfre.org/arte-y-cultura/exposiciones/sala-recoletos/", "museo"),
+    Fuente("Conde Duque", "https://www.condeduquemadrid.es/programacion", "agenda"),
+    Fuente("Fundación Masaveu", "https://www.fundacioncristinamasaveu.com/", "museo"),
+    Fuente("Alcalá 31", "https://www.comunidad.madrid/centros/sala-alcala-31", "museo"),
     # Estas tres sirven cadenas de certificado incompletas; fetch_html reintenta
     # sin verificar. Estaban muertas desde abril por eso, no por falta de contenido.
-    ("Museo de Artes Decorativas", "https://www.culturaydeporte.gob.es/mnartesdecorativas/exposiciones/actuales.html"),
-    ("Museo Cerralbo", "https://www.culturaydeporte.gob.es/mcerralbo/actividades/programacion-en-curso.html"),
-    ("Fundación ICO", "https://www.fundacionico.es/arte"),
+    Fuente("Museo de Artes Decorativas", "https://www.culturaydeporte.gob.es/mnartesdecorativas/exposiciones/actuales.html", "museo"),
+    Fuente("Museo Cerralbo", "https://www.culturaydeporte.gob.es/mcerralbo/actividades/programacion-en-curso.html", "museo"),
+    Fuente("Fundación ICO", "https://www.fundacionico.es/arte", "museo"),
+    Fuente("La Casa Encendida", "https://www.lacasaencendida.es/exposiciones", "museo"),
+    Fuente("Museo ABC", "https://museo.abc.es/exposiciones", "museo"),
+    Fuente("Biblioteca Nacional", "https://www.bne.es/es/agenda", "agenda"),
 ]
 
 
 def scrape() -> list[dict]:
-    """Scrape todas las fuentes de museos. Devuelve lista de eventos."""
-    all_events = []
-    for entry in FUENTES:
-        name, url = entry[0], entry[1]
-        truncate = entry[2] if len(entry) > 2 else None
-        try:
-            all_events.extend(extract_events(url, source_name=name, section="museo",
-                                             truncate_before=truncate))
-        except Exception:
-            log.exception("  ✗ Error scraping %s", name)
-    return all_events
+    return [e for f in FUENTES for e in extract(f)]

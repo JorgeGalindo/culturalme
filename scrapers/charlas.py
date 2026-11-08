@@ -1,28 +1,27 @@
 """
-Scraper de charlas y conferencias en Madrid.
-Modo: LLM (Claude Haiku).
+Charlas, conferencias y agendas mixtas (fundaciones que programan de todo).
+
+Las fuentes "agenda" traen exposiciones, charlas, conciertos o cine en la
+misma página; el modelo clasifica cada actividad y cae en su pestaña.
 """
 
-import logging
-from scrapers.llm import extract_events
+from scrapers.llm import Fuente, extract
 
-log = logging.getLogger(__name__)
-
-# Revisadas 2026-08-20. Ateneo, IE Foundation, Juan March y Casa Árabe salen:
-# las tres primeras nunca produjeron nada, Casa Árabe dejó de hacerlo en julio.
+# Revisadas 2026-08-20. Ateneo, IE Foundation y Casa Árabe salen: nunca
+# produjeron nada o dejaron de hacerlo. Juan March vuelve el 2026-11-08 con su
+# página de actividades (la de 2026-08 era otra URL). Real Instituto Elcano y
+# Residencia de Estudiantes probadas el 2026-11-08: casi sin texto.
 FUENTES = [
-    ("Fundación Ramón Areces", "https://www.fundacionareces.es/fundacionareces/es/actividades/"),
-    ("Fundación Rafael del Pino", "https://frdelpino.es/eventos/todos-los-eventos/"),
-    ("CBA", "https://www.circulobellasartes.com/agenda/"),
-    ("Fundación Telefónica", "https://espacio.fundaciontelefonica.com/agenda/"),
+    Fuente("Fundación Ramón Areces", "https://www.fundacionareces.es/fundacionareces/es/actividades/", "charla"),
+    Fuente("Fundación Rafael del Pino", "https://frdelpino.es/eventos/todos-los-eventos/", "charla"),
+    Fuente("Círculo de Bellas Artes", "https://www.circulobellasartes.com/agenda/", "agenda"),
+    Fuente("Fundación Telefónica", "https://espacio.fundaciontelefonica.com/agenda/", "charla"),
+    Fuente("Fundación Juan March", "https://www.march.es/es/madrid/actividades", "agenda"),
+    Fuente("Casa de América", "https://www.casamerica.es/agenda", "agenda"),
+    Fuente("Fundación BBVA", "https://www.fbbva.es/agenda/", "agenda", render=True),
+    Fuente("CaixaForum Madrid", "https://caixaforum.org/es/madrid/actividades", "agenda"),
 ]
 
 
 def scrape() -> list[dict]:
-    all_events = []
-    for name, url in FUENTES:
-        try:
-            all_events.extend(extract_events(url, source_name=name, section="charla"))
-        except Exception:
-            log.exception("  ✗ Error scraping %s", name)
-    return all_events
+    return [e for f in FUENTES for e in extract(f)]

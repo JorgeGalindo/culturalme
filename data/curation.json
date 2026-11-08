@@ -1,0 +1,46 @@
+{
+ "generated_at": "2026-11-08T08:44:43+00:00",
+ "desde": "2026-11-08",
+ "hasta": "2026-11-17",
+ "model": "claude-sonnet-5-5",
+ "semana": [
+  {
+   "id": "498eefe37033d882",
+   "por_que": "Abhijit Banerjee, premio Nobel de Economía junto a Esther Duflo, da una conferencia magistral sobre la pobreza. Una sola fecha, el lunes 16."
+  },
+  {
+   "id": "9e589ab7d135ee6d",
+   "por_que": "La cantautora londinense Arlo Parks, Mercury Prize 2021 con Collapsed in Sunbeams, mezcla indie y soul íntimo. Una única noche en Madrid, el martes 10."
+  },
+  {
+   "id": "95b307b2678cdfbf",
+   "por_que": "Max Cooper, productor de electrónica de autor, suele llevar su música con visuales generativos. Concierto de una sola noche, el domingo 8."
+  },
+  {
+   "id": "422ec900e2c82255",
+   "por_que": "King Vidor filma en 1934 una granja cooperativa levantada por parados de la Depresión. Lo presenta Manuel Hidalgo, dentro del ciclo de cine social del Pre-Code."
+  },
+  {
+   "id": "06b39cbeff9e5cf1",
+   "por_que": "Simposio internacional de cinco horas sobre cuánta energía va a demandar la economía y qué papel pueden tener las renovables. Solo el jueves 12, de 10:00 a 15:00."
+  },
+  {
+   "id": "49cfa5b15eb31c7a",
+   "por_que": "Documental sobre escuelas ucranianas que siguen abiertas durante la guerra, sin entrevistas ni narración, solo imagen y sonido. Un único pase, el domingo 8."
+  }
+ ],
+ "ninos": [
+  {
+   "id": "3d7e119f5838d544",
+   "por_que": "Kenny Scharf pinta con colores de neón y personajes de dibujo animado, y llena salas de instalaciones; entra todo por los ojos y está en el Thyssen hasta enero."
+  },
+  {
+   "id": "a4a324c3574f5851",
+   "por_que": "Jessica Stockholder construye instalaciones a gran escala con objetos cotidianos y mucho color. Cardinal Directions, de 2025, es una pieza para recorrer y mirar despacio."
+  },
+  {
+   "id": "e9e1c7652cc5d24d",
+   "por_que": "Festival de cine para niños con proyecciones-concierto, pensado para su edad. Quedan sesiones el domingo 8 y el domingo 15; la última es el 22."
+  }
+ ]
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Pasada semanal de culturalme en el Mac mini, viernes a las 07:00.
+     caffeinate -i evita que el mini se duerma a mitad (pmset sleep 1).
+     Instalar:
+       cp ops/com.jorge.culturalme-semanal.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.jorge.culturalme-semanal.plist -->
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>com.jorge.culturalme-semanal</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/caffeinate</string>
+		<string>-i</string>
+		<string>/Users/jorge/repos/culturalme/.venv/bin/python</string>
+		<string>/Users/jorge/repos/culturalme/semanal.py</string>
+	</array>
+	<key>WorkingDirectory</key><string>/Users/jorge/repos/culturalme</string>
+	<key>StartCalendarInterval</key>
+	<dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key><string>/Users/jorge/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>StandardOutPath</key><string>/Users/jorge/Library/Logs/culturalme-semanal.log</string>
+	<key>StandardErrorPath</key><string>/Users/jorge/Library/Logs/culturalme-semanal.log</string>
+</dict>
+</plist>

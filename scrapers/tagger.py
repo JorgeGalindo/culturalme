@@ -9,19 +9,30 @@ Sólo re-etiqueta filas cuyo tags_hash ya no coincide con el manifiesto/versión
 import hashlib
 import json
 import logging
-import re
 import sqlite3
-import time
 from pathlib import Path
 
-from scrapers.llm import MODEL, THROTTLE_SECONDS, _get_client
+from scrapers.llm import claude_json
 
 log = logging.getLogger(__name__)
 
 TASTE_PATH = Path(__file__).parent.parent / "data" / "jorge_taste.md"
 KIDS_PATH = Path(__file__).parent.parent / "data" / "kids_taste.md"
 TAGGER_VERSION = "v3"
-BATCH_SIZE = 40
+BATCH_SIZE = 80  # cada lote es un `claude -p`; con menos lotes, menos arranques
+
+TAG_SCHEMA = {
+    "type": "object",
+    "properties": {"tags": {"type": "array", "items": {
+        "type": "object",
+        "properties": {"i": {"type": "integer"},
+                       "kids_friendly": {"type": "integer", "enum": [0, 1]},
+                       "selective": {"type": "integer", "enum": [0, 1]}},
+        "required": ["i", "kids_friendly", "selective"],
+        "additionalProperties": False}}},
+    "required": ["tags"],
+    "additionalProperties": False,
+}
 
 
 def _kids_rules(kids_manifesto: str | None) -> str:
@@ -72,10 +83,8 @@ KIDS_FRIENDLY:
 SELECTIVE:
 {_selective_rules(taste)}
 
-Devuelve un JSON array con un objeto por evento, en el MISMO ORDEN, con la misma "i":
-[{{"i": 0, "kids_friendly": 0|1, "selective": 0|1}}, ...]
-
-Sólo el array, sin explicaciones.
+Devuelve en "tags" un objeto por evento, con la misma "i":
+{{"i": 0, "kids_friendly": 0|1, "selective": 0|1}}
 
 Eventos:
 {json.dumps(payload, ensure_ascii=False)}
@@ -88,32 +97,10 @@ def _signature(taste: str | None, kids_manifesto: str | None) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
-def _parse_response(text: str) -> list[dict]:
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\[.*\]", text, re.S)
-        if not match:
-            return []
-        return json.loads(match.group())
-
-
 def _tag_batch(events: list[dict], taste: str | None,
                 kids_manifesto: str | None) -> list[dict]:
     """Etiqueta un batch. Devuelve lista alineada por índice; rellena con 0/0 si falta."""
-    client = _get_client()
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=4096,
-        messages=[{"role": "user", "content": _build_prompt(events, taste, kids_manifesto)}],
-    )
-    raw = _parse_response(response.content[0].text)
+    raw = claude_json(_build_prompt(events, taste, kids_manifesto), TAG_SCHEMA)["tags"]
     by_i = {r.get("i"): r for r in raw if isinstance(r, dict)}
 
     result = []
@@ -123,7 +110,6 @@ def _tag_batch(events: list[dict], taste: str | None,
             "kids_friendly": 1 if r.get("kids_friendly") else 0,
             "selective": 1 if r.get("selective") else 0,
         })
-    time.sleep(THROTTLE_SECONDS)
     return result
 
 
